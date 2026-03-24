@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"llmclientwrapper/src/internal"
 	"llmclientwrapper/src/internal/infrastructure/anthropic"
@@ -26,31 +30,28 @@ func main() {
 func newRootCmd() *cobra.Command {
 	var (
 		modelFlag      string
-		questionFlag   string
 		systemFlag     string
 		systemFileFlag string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "llmclientwrapper",
-		Short: "Ask a question to an LLM model",
+		Short: "Interactive LLM conversation session",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), modelFlag, questionFlag, systemFlag, systemFileFlag)
+			return run(cmd.Context(), modelFlag, systemFlag, systemFileFlag)
 		},
 	}
 
 	cmd.Flags().StringVar(&modelFlag, "model", "", "Model alias to use (e.g. sonnet-4.6, devstral)")
-	cmd.Flags().StringVar(&questionFlag, "question", "", "Question to ask")
 	cmd.Flags().StringVar(&systemFlag, "system", "", "Inline system prompt (overrides --system-file)")
 	cmd.Flags().StringVar(&systemFileFlag, "system-file", defaultSystemPromptPath(), "Path to a Markdown system prompt file")
 
 	_ = cmd.MarkFlagRequired("model")
-	_ = cmd.MarkFlagRequired("question")
 
 	return cmd
 }
 
-func run(ctx context.Context, modelAlias, question, systemInline, systemFile string) error {
+func run(ctx context.Context, modelAlias, systemInline, systemFile string) error {
 	cfg, err := config.Load(".env")
 	if err != nil {
 		return err
@@ -73,12 +74,34 @@ func run(ctx context.Context, modelAlias, question, systemInline, systemFile str
 	store := memory.NewStore()
 	manager := internal.NewConversationManager(client, store, pp, tools)
 
-	answer, err := manager.Chat(ctx, question)
-	if err != nil {
-		return err
+	fmt.Println("Session started. Type \"exit\" or press Ctrl+C to quit.")
+	scanner := bufio.NewScanner(os.Stdin)
+	for {
+		fmt.Print("\nYou: ")
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil && !errors.Is(err, io.EOF) {
+				return err
+			}
+			break
+		}
+
+		input := strings.TrimSpace(scanner.Text())
+		if input == "" {
+			continue
+		}
+		if strings.EqualFold(input, "exit") || strings.EqualFold(input, "quit") {
+			break
+		}
+
+		answer, err := manager.Chat(ctx, input)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("\nAssistant: %s\n", answer)
 	}
 
-	fmt.Println(answer)
+	fmt.Println("\nSession ended.")
 	return nil
 }
 
