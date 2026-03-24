@@ -1,0 +1,9 @@
+# Environment variables — never commit real keys
+.env
+
+# Compiled binaries
+bin/
+
+# Coverage artefacts
+coverage.out
+coverage.html
