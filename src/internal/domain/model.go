@@ -1,4 +1,4 @@
-package internal
+package domain
 
 import "fmt"
 
@@ -25,7 +25,7 @@ var registry = map[Model]ModelDescriptor{
 	"haiku-4.5":  {Provider: ProviderAnthropic, APIModelID: "claude-haiku-4-5"},
 	"sonnet-4.6": {Provider: ProviderAnthropic, APIModelID: "claude-sonnet-4-5"},
 	"gpt-5.4":    {Provider: ProviderOpenAI, APIModelID: "gpt-4o"},
-	"devstral":   {Provider: ProviderMistral, APIModelID: "devstral-small-2505"},
+	"mistral-small":   {Provider: ProviderMistral, APIModelID: "mistral-small-2506"},
 }
 
 // Lookup returns the ModelDescriptor for a given alias.

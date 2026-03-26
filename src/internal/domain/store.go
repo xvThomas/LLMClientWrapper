@@ -1,4 +1,4 @@
-package internal
+package domain
 
 // MessageStore persists conversation messages.
 type MessageStore interface {

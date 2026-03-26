@@ -3,13 +3,13 @@ package anthropic
 import (
 	"context"
 	"fmt"
-	"llmclientwrapper/src/internal"
+	"llmclientwrapper/src/internal/domain"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-// Client implements internal.LlmClient using the Anthropic API.
+// Client implements domain.LlmClient using the Anthropic API.
 type Client struct {
 	sdk     *anthropic.Client
 	modelID string
@@ -22,7 +22,7 @@ func NewClient(apiKey, modelID string) *Client {
 }
 
 // Complete sends the conversation to Anthropic and returns the assistant response.
-func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []internal.Message, tools []internal.Tool) (*internal.Message, error) {
+func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []domain.Message, tools []domain.Tool) (*domain.Message, error) {
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.modelID),
 		MaxTokens: 4096,

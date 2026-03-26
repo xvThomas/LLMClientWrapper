@@ -26,38 +26,34 @@ $EDITOR .env
 # 3. Build
 make build
 
-# 4. Ask a question
-make run MODEL=sonnet-4.6 QUESTION="What is the temperature in the capital of France?"
+# 4. Start an interactive session
+make run MODEL=sonnet-4.6
 ```
 
 Or without `make`:
 
 ```bash
-go run ./src/cmd --model sonnet-4.6 --question "What is the temperature in the capital of France?"
-```
-
-Use a custom inline system prompt:
-
-```bash
-go run ./src/cmd --model gpt-5.4 --system "You are a concise assistant." --question "Hello"
+go run ./src/cmd --model sonnet-4.6
 ```
 
 Use a custom system prompt file:
 
 ```bash
-go run ./src/cmd --model devstral --system-file ./my_prompt.md --question "Hello"
+go run ./src/cmd --model mistral-small --system-file ./my_prompt.md
 ```
+
+Type `exit` or `quit` (or press `Ctrl+C`) to end the session.
 
 ---
 
 ## Available models
 
-| Alias        | Provider  | Notes                          |
-|--------------|-----------|--------------------------------|
-| `haiku-4.5`  | Anthropic | Fast and cheap                 |
-| `sonnet-4.6` | Anthropic | Balanced                       |
-| `gpt-5.4`    | OpenAI    |                                |
-| `devstral`   | Mistral   | OpenAI-compatible API          |
+| Alias           | Provider  | Notes                 |
+| --------------- | --------- | --------------------- |
+| `haiku-4.5`     | Anthropic | Fast and cheap        |
+| `sonnet-4.6`    | Anthropic | Balanced              |
+| `gpt-5.4`       | OpenAI    |                       |
+| `mistral-small` | Mistral   | OpenAI-compatible API |
 
 ---
 
@@ -65,12 +61,12 @@ go run ./src/cmd --model devstral --system-file ./my_prompt.md --question "Hello
 
 Copy `.env.example` to `.env` and fill in the relevant keys:
 
-| Variable                  | Required for              |
-|---------------------------|---------------------------|
-| `ANTHROPIC_API_KEY`       | `haiku-4.5`, `sonnet-4.6` |
-| `OPENAI_API_KEY`          | `gpt-5.4`                 |
-| `MISTRAL_API_KEY`         | `devstral`                |
-| `OPENWEATHERMAP_API_KEY`  | weather tool calls        |
+| Variable                 | Required for              |
+| ------------------------ | ------------------------- |
+| `ANTHROPIC_API_KEY`      | `haiku-4.5`, `sonnet-4.6` |
+| `OPENAI_API_KEY`         | `gpt-5.4`                 |
+| `MISTRAL_API_KEY`        | `mistral-small`           |
+| `OPENWEATHERMAP_API_KEY` | weather tool calls        |
 
 ---
 
@@ -78,13 +74,9 @@ Copy `.env.example` to `.env` and fill in the relevant keys:
 
 By default the CLI loads `system_prompt.md` from the same directory as the executable. Edit that file to customise the assistant's persona without recompiling.
 
-Override at runtime:
+Override at runtime with `--system-file`:
 
 ```bash
-# inline
---system "You are a helpful assistant."
-
-# file
 --system-file /path/to/prompt.md
 ```
 
@@ -92,33 +84,36 @@ Override at runtime:
 
 ## Make targets
 
-| Target          | Description                                       |
-|-----------------|---------------------------------------------------|
-| `make build`    | Compile to `bin/llmclientwrapper`                 |
-| `make run`      | `go run` with `MODEL=` and `QUESTION=` vars       |
-| `make test`     | Run all unit tests                                |
-| `make cover`    | Generate `coverage.html` (opens-ready HTML report)|
-| `make cover-summary` | Print per-package coverage percentages      |
-| `make vet`      | Run `go vet`                                      |
-| `make clean`    | Remove `bin/`, `coverage.out`, `coverage.html`    |
+| Target               | Description                                                     |
+| -------------------- | --------------------------------------------------------------- |
+| `make build`         | Compile to `bin/llmclientwrapper`                               |
+| `make run`           | Interactive session — override with `MODEL=` and `SYSTEM_FILE=` |
+| `make test`          | Run all unit tests                                              |
+| `make cover`         | Generate `coverage.html` (opens-ready HTML report)              |
+| `make cover-summary` | Print per-package coverage percentages                          |
+| `make vet`           | Run `go vet`                                                    |
+| `make clean`         | Remove `bin/`, `coverage.out`, `coverage.html`                  |
 
 ---
 
 ## Project structure
 
-```
+```txt
 .
 ├── src/
-│   ├── internal/               # Domain interfaces & types
-│   │   ├── infrastructure/     # External-library implementations
-│   │   │   ├── anthropic/
-│   │   │   ├── openai/
-│   │   │   ├── weather/
-│   │   │   ├── prompt/
-│   │   │   ├── memory/
-│   │   │   └── config/
-│   └── cmd/                    # CLI entry point
-├── system_prompt.md            # Default system prompt
+│   ├── cmd/                        # CLI entry point (interactive REPL)
+│   └── internal/
+│       ├── domain/                 # Interfaces & types (Model, Message, Tool …)
+│       └── infrastructure/
+│           ├── llm/                # LLM provider implementations
+│           │   ├── anthropic/
+│           │   ├── openai/
+│           │   └── router/         # Builds LlmClient from config + model alias
+│           ├── config/             # .env loader
+│           ├── memory/             # In-memory conversation store
+│           ├── prompt/             # File & static prompt providers
+│           └── weather/            # OpenWeatherMap tool
+├── system_prompt.md                # Default system prompt
 ├── .env.example
 └── Makefile
 ```

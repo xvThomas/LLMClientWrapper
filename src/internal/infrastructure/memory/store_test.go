@@ -1,14 +1,14 @@
 package memory
 
 import (
-	"llmclientwrapper/src/internal"
+	"llmclientwrapper/src/internal/domain"
 	"testing"
 )
 
 func TestStore_AddAndAll(t *testing.T) {
 	s := NewStore()
-	s.Add(internal.Message{Role: internal.RoleUser, Content: "hello"})
-	s.Add(internal.Message{Role: internal.RoleAssistant, Content: "world"})
+	s.Add(domain.Message{Role: domain.RoleUser, Content: "hello"})
+	s.Add(domain.Message{Role: domain.RoleAssistant, Content: "world"})
 
 	msgs := s.All()
 	if len(msgs) != 2 {
@@ -21,7 +21,7 @@ func TestStore_AddAndAll(t *testing.T) {
 
 func TestStore_AllReturnsCopy(t *testing.T) {
 	s := NewStore()
-	s.Add(internal.Message{Role: internal.RoleUser, Content: "original"})
+	s.Add(domain.Message{Role: domain.RoleUser, Content: "original"})
 
 	msgs := s.All()
 	msgs[0].Content = "mutated"
@@ -34,7 +34,7 @@ func TestStore_AllReturnsCopy(t *testing.T) {
 
 func TestStore_Clear(t *testing.T) {
 	s := NewStore()
-	s.Add(internal.Message{Role: internal.RoleUser, Content: "hello"})
+	s.Add(domain.Message{Role: domain.RoleUser, Content: "hello"})
 	s.Clear()
 
 	if len(s.All()) != 0 {

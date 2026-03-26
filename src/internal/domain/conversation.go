@@ -1,4 +1,4 @@
-package internal
+package domain
 
 import (
 	"context"
@@ -23,6 +23,11 @@ func NewConversationManager(client LlmClient, store MessageStore, pp PromptProvi
 		promptProvider: pp,
 		tools:          tools,
 	}
+}
+
+// SetClient replaces the active LLM client without resetting the conversation history.
+func (m *ConversationManager) SetClient(client LlmClient) {
+	m.client = client
 }
 
 // Chat sends a user message and returns the final assistant text response.

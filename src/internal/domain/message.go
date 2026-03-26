@@ -1,4 +1,4 @@
-package internal
+package domain
 
 // Role represents the author of a message in a conversation.
 type Role string

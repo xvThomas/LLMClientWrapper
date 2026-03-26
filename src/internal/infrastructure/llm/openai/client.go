@@ -3,13 +3,13 @@ package openai
 import (
 	"context"
 	"fmt"
-	"llmclientwrapper/src/internal"
+	"llmclientwrapper/src/internal/domain"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
 
-// Client implements internal.LlmClient using an OpenAI-compatible API.
+// Client implements domain.LlmClient using an OpenAI-compatible API.
 // It works with OpenAI, Mistral, and any other provider that exposes the
 // OpenAI chat completions API.
 type Client struct {
@@ -29,7 +29,7 @@ func NewClient(apiKey, modelID, baseURL string) *Client {
 }
 
 // Complete sends the conversation to the OpenAI-compatible API and returns the response.
-func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []internal.Message, tools []internal.Tool) (*internal.Message, error) {
+func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []domain.Message, tools []domain.Tool) (*domain.Message, error) {
 	params := openai.ChatCompletionNewParams{
 		Model:    openai.ChatModel(c.modelID),
 		Messages: toSDKMessages(systemPrompt, messages),

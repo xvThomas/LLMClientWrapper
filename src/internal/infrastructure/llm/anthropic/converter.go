@@ -2,28 +2,28 @@ package anthropic
 
 import (
 	"encoding/json"
-	"llmclientwrapper/src/internal"
+	"llmclientwrapper/src/internal/domain"
 
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
 // toSDKMessages converts domain messages to Anthropic SDK message params.
-func toSDKMessages(messages []internal.Message) []anthropic.MessageParam {
+func toSDKMessages(messages []domain.Message) []anthropic.MessageParam {
 	params := make([]anthropic.MessageParam, 0, len(messages))
 	for _, msg := range messages {
 		switch msg.Role {
-		case internal.RoleUser:
+		case domain.RoleUser:
 			params = append(params, anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content)))
-		case internal.RoleAssistant:
+		case domain.RoleAssistant:
 			params = append(params, toAssistantParam(msg))
-		case internal.RoleTool:
+		case domain.RoleTool:
 			params = append(params, toToolResultParam(msg))
 		}
 	}
 	return params
 }
 
-func toAssistantParam(msg internal.Message) anthropic.MessageParam {
+func toAssistantParam(msg domain.Message) anthropic.MessageParam {
 	blocks := make([]anthropic.ContentBlockParamUnion, 0)
 	if msg.Content != "" {
 		blocks = append(blocks, anthropic.NewTextBlock(msg.Content))
@@ -35,7 +35,7 @@ func toAssistantParam(msg internal.Message) anthropic.MessageParam {
 	return anthropic.NewAssistantMessage(blocks...)
 }
 
-func toToolResultParam(msg internal.Message) anthropic.MessageParam {
+func toToolResultParam(msg domain.Message) anthropic.MessageParam {
 	blocks := make([]anthropic.ContentBlockParamUnion, 0, len(msg.ToolResults))
 	for _, tr := range msg.ToolResults {
 		blocks = append(blocks, anthropic.NewToolResultBlock(tr.ToolCallID, tr.Content, false))
@@ -44,7 +44,7 @@ func toToolResultParam(msg internal.Message) anthropic.MessageParam {
 }
 
 // toSDKTools converts domain tools to Anthropic SDK tool definitions.
-func toSDKTools(tools []internal.Tool) []anthropic.ToolUnionParam {
+func toSDKTools(tools []domain.Tool) []anthropic.ToolUnionParam {
 	sdkTools := make([]anthropic.ToolUnionParam, 0, len(tools))
 	for _, t := range tools {
 		params := t.Parameters()
@@ -70,8 +70,8 @@ func toSDKTools(tools []internal.Tool) []anthropic.ToolUnionParam {
 }
 
 // fromSDKResponse converts an Anthropic SDK response to a domain Message.
-func fromSDKResponse(resp *anthropic.Message) *internal.Message {
-	msg := &internal.Message{Role: internal.RoleAssistant}
+func fromSDKResponse(resp *anthropic.Message) *domain.Message {
+	msg := &domain.Message{Role: domain.RoleAssistant}
 	for _, block := range resp.Content {
 		switch block.Type {
 		case "text":
@@ -79,7 +79,7 @@ func fromSDKResponse(resp *anthropic.Message) *internal.Message {
 		case "tool_use":
 			var input map[string]any
 			_ = json.Unmarshal(block.Input, &input)
-			msg.ToolCalls = append(msg.ToolCalls, internal.ToolCall{
+			msg.ToolCalls = append(msg.ToolCalls, domain.ToolCall{
 				ID:    block.ID,
 				Name:  block.Name,
 				Input: input,

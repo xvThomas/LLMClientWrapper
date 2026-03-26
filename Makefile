@@ -1,7 +1,7 @@
 BINARY   := bin/llmclientwrapper
 CMD      := ./src/cmd
-MODEL    ?= sonnet-4.6
-QUESTION ?= Hello
+MODEL    ?= haiku-4.5
+SYSTEM_FILE := ./system_prompt.md
 
 .PHONY: all build run test cover cover-summary vet clean
 
@@ -11,7 +11,7 @@ build:
 	go build -o $(BINARY) $(CMD)
 
 run:
-	go run $(CMD) --model $(MODEL) --question "$(QUESTION)"
+	go run $(CMD) --model $(MODEL) --system-file $(SYSTEM_FILE)
 
 test:
 	go test ./...

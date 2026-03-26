@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"llmclientwrapper/src/internal/domain"
 	"net/http"
 	"net/url"
 )
 
 const defaultBaseURL = "https://api.openweathermap.org/data/2.5"
 
-// Tool implements internal.Tool for fetching current weather via OpenWeatherMap.
+// Tool implements domain.Tool for fetching current weather via OpenWeatherMap.
 type Tool struct {
 	apiKey  string
 	baseURL string
@@ -21,6 +22,8 @@ type Tool struct {
 func NewTool(apiKey string) *Tool {
 	return &Tool{apiKey: apiKey, baseURL: defaultBaseURL, http: &http.Client{}}
 }
+
+var _ domain.Tool = (*Tool)(nil) // ensure Tool implements domain.Tool
 
 // newToolWithBaseURL creates a WeatherTool with a custom base URL (for testing).
 func newToolWithBaseURL(apiKey, baseURL string, client *http.Client) *Tool {
