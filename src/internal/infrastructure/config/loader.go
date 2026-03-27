@@ -15,6 +15,14 @@ type Config struct {
 	MistralAPIKey        string
 	OpenWeatherMapAPIKey string
 	ToolsMaxConcurrent   int // Max concurrent tool executions (default: 4)
+
+	// Langfuse configuration
+	LangfuseSecretKey string // LANGFUSE_SECRET_KEY="sk-lf-..."
+	LangfusePublicKey string // LANGFUSE_PUBLIC_KEY="pk-lf-..."
+	LangfuseBaseURL   string // LANGFUSE_BASE_URL="https://cloud.langfuse.com" (default)
+
+	// Reporter configuration
+	ConsoleUsageReporter bool // CONSOLE_USAGE_REPORTER=true/false (default: true)
 }
 
 // Load reads the .env file (if present) then reads environment variables.
@@ -28,6 +36,14 @@ func Load(envFile string) (*Config, error) {
 		MistralAPIKey:        os.Getenv("MISTRAL_API_KEY"),
 		OpenWeatherMapAPIKey: os.Getenv("OPENWEATHERMAP_API_KEY"),
 		ToolsMaxConcurrent:   parseToolsMaxConcurrent(os.Getenv("TOOLS_MAX_CONCURRENT")),
+
+		// Langfuse configuration
+		LangfuseSecretKey: os.Getenv("LANGFUSE_SECRET_KEY"),
+		LangfusePublicKey: os.Getenv("LANGFUSE_PUBLIC_KEY"),
+		LangfuseBaseURL:   parseLangfuseBaseURL(os.Getenv("LANGFUSE_BASE_URL")),
+
+		// Reporter configuration
+		ConsoleUsageReporter: parseConsoleUsageReporter(os.Getenv("CONSOLE_USAGE_REPORTER")),
 	}
 
 	return cfg, nil
@@ -69,4 +85,29 @@ func parseToolsMaxConcurrent(value string) int {
 		return n
 	}
 	return 4 // Fallback on invalid input
+}
+
+// parseLangfuseBaseURL parses LANGFUSE_BASE_URL with fallback to default.
+func parseLangfuseBaseURL(value string) string {
+	if value == "" {
+		return "https://cloud.langfuse.com" // Default Langfuse Cloud EU region
+	}
+	return value
+}
+
+// parseConsoleUsageReporter parses CONSOLE_USAGE_REPORTER with fallback to true.
+// Accepts: true, false, 1, 0, yes, no (case insensitive)
+func parseConsoleUsageReporter(value string) bool {
+	if value == "" {
+		return true // Default: console reporter enabled for backward compatibility
+	}
+
+	switch value {
+	case "true", "1", "yes", "True", "TRUE", "Yes", "YES":
+		return true
+	case "false", "0", "no", "False", "FALSE", "No", "NO":
+		return false
+	default:
+		return true // Default on invalid input
+	}
 }

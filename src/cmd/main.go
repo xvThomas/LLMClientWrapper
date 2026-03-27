@@ -17,6 +17,7 @@ import (
 	"llmclientwrapper/src/internal/infrastructure/memory"
 	"llmclientwrapper/src/internal/infrastructure/prompt"
 	infratools "llmclientwrapper/src/internal/infrastructure/tools"
+	"llmclientwrapper/src/internal/infrastructure/usage"
 
 	"github.com/spf13/cobra"
 )
@@ -83,7 +84,33 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 	tools := infratools.New(cfg).All()
 
 	store := memory.NewStore()
-	manager := domain.NewConversationManager(client, modelAlias, store, pp, tools, ConsoleUsageReporter{}, cfg.ToolsMaxConcurrent)
+
+	// Create usage reporters based on configuration
+	var reporters []domain.UsageReporter
+
+	// Console reporter if enabled (default: true for backward compatibility)
+	if cfg.ConsoleUsageReporter {
+		reporters = append(reporters, &usage.ConsoleUsageReporter{})
+	}
+
+	// Langfuse reporter if both keys are present
+	if cfg.LangfuseSecretKey != "" && cfg.LangfusePublicKey != "" {
+		langfuseConfig := usage.LangfuseConfig{
+			PublicKey: cfg.LangfusePublicKey,
+			SecretKey: cfg.LangfuseSecretKey,
+			BaseURL:   cfg.LangfuseBaseURL,
+		}
+		langfuseReporter := usage.NewLangfuseUsageReporter(langfuseConfig)
+		reporters = append(reporters, langfuseReporter)
+	}
+
+	// Ensure at least one reporter is active
+	if len(reporters) == 0 {
+		// Fallback to console reporter if no other reporters are configured
+		reporters = append(reporters, &usage.ConsoleUsageReporter{})
+	}
+
+	manager := domain.NewConversationManager(client, modelAlias, store, pp, tools, reporters, cfg.ToolsMaxConcurrent)
 	currentModel := modelAlias
 
 	fmt.Print(cyan(bold+"Session started."+reset) + `

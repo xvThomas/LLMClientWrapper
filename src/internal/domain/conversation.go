@@ -3,7 +3,9 @@ package domain
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 )
 
 const maxToolCalls = 5
@@ -15,21 +17,65 @@ type ConversationManager struct {
 	store              MessageStore
 	promptProvider     PromptProvider
 	tools              []Tool
-	reporter           UsageReporter
-	maxConcurrentTools int // Maximum concurrent tool executions
+	reporters          []UsageReporter // Multiple reporters for parallel execution
+	maxConcurrentTools int             // Maximum concurrent tool executions
 }
 
 // NewConversationManager creates a ConversationManager.
-func NewConversationManager(client LlmClient, modelID string, store MessageStore, pp PromptProvider, tools []Tool, reporter UsageReporter, maxConcurrentTools int) *ConversationManager {
+func NewConversationManager(client LlmClient, modelID string, store MessageStore, pp PromptProvider, tools []Tool, reporters []UsageReporter, maxConcurrentTools int) *ConversationManager {
 	return &ConversationManager{
 		client:             client,
 		modelID:            modelID,
 		store:              store,
 		promptProvider:     pp,
 		tools:              tools,
-		reporter:           reporter,
+		reporters:          reporters,
 		maxConcurrentTools: maxConcurrentTools,
 	}
+}
+
+// reportAPICall calls OnAPICall on all reporters in parallel.
+func (m *ConversationManager) reportAPICall(event APICallEvent) {
+	if len(m.reporters) == 0 {
+		return
+	}
+
+	var wg sync.WaitGroup
+	for _, reporter := range m.reporters {
+		wg.Add(1)
+		go func(r UsageReporter) {
+			defer wg.Done()
+			defer func() {
+				// Don't let reporter panics crash the application
+				if recover() != nil {
+				}
+			}()
+			r.OnAPICall(event)
+		}(reporter)
+	}
+	wg.Wait()
+}
+
+// reportConversationTurn calls OnConversationTurn on all reporters in parallel.
+func (m *ConversationManager) reportConversationTurn(event TurnEvent) {
+	if len(m.reporters) == 0 {
+		return
+	}
+
+	var wg sync.WaitGroup
+	for _, reporter := range m.reporters {
+		wg.Add(1)
+		go func(r UsageReporter) {
+			defer wg.Done()
+			defer func() {
+				// Don't let reporter panics crash the application
+				if recover() != nil {
+				}
+			}()
+			r.OnConversationTurn(event)
+		}(reporter)
+	}
+	wg.Wait()
 }
 
 // SetClient replaces the active LLM client and model without resetting the conversation history.
@@ -48,28 +94,60 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 
 	m.store.Add(Message{Role: RoleUser, Content: userInput})
 
+	turnStartedAt := time.Now()
+	turnTraceID := GenerateTraceID()
+	turnSpanID := GenerateSpanID()
 	var totalUsage Usage
+	var allToolCalls []ToolCall // Collect all tool calls for the turn event
+	var lastCallEndedAt time.Time
 	callCount := 0
 	kind := CallKindInitial
 
 	for range maxToolCalls {
-		response, usage, err := m.client.Complete(ctx, systemPrompt, m.store.All(), m.tools)
+		// Get the current conversation context for the API call input
+		messages := m.store.All()
+		conversationInput := formatMessagesAsInput(messages, systemPrompt)
+
+		callStartedAt := time.Now()
+		response, usage, err := m.client.Complete(ctx, systemPrompt, messages, m.tools)
 		if err != nil {
 			return "", fmt.Errorf("model completion: %w", err)
 		}
+		lastCallEndedAt = time.Now()
 
-		m.reporter.OnAPICall(APICallEvent{Model: m.modelID, Kind: kind, Usage: usage})
+		// Report API call with input, output, and tool calls
+		m.reportAPICall(APICallEvent{
+			TraceID:      turnTraceID,
+			ParentSpanID: turnSpanID,
+			StartedAt:    callStartedAt,
+			EndedAt:      lastCallEndedAt,
+			Model:        m.modelID,
+			Kind:         kind,
+			Usage:        usage,
+			Input:        conversationInput,
+			Output:       formatAPICallOutput(response.Content, response.ToolCalls),
+			ToolCalls:    response.ToolCalls,
+		})
+
 		totalUsage = totalUsage.Add(usage)
+		allToolCalls = append(allToolCalls, response.ToolCalls...)
 		callCount++
 		kind = CallKindToolResult
 
 		m.store.Add(*response)
 
 		if len(response.ToolCalls) == 0 {
-			m.reporter.OnConversationTurn(TurnEvent{
+			m.reportConversationTurn(TurnEvent{
+				TraceID:    turnTraceID,
+				SpanID:     turnSpanID,
+				StartedAt:  turnStartedAt,
+				EndedAt:    time.Now(),
 				Model:      m.modelID,
 				TotalUsage: totalUsage,
 				CallCount:  callCount,
+				Input:      userInput,
+				Output:     response.Content,
+				ToolCalls:  allToolCalls,
 			})
 			return response.Content, nil
 		}
@@ -156,4 +234,56 @@ func (m *ConversationManager) executeTool(ctx context.Context, call ToolCall) (T
 		}
 	}
 	return ToolResult{}, fmt.Errorf("unknown tool %q", call.Name)
+}
+
+// formatMessagesAsInput formats the conversation messages as a readable input string for observability
+// formatMessagesAsInput returns the most relevant input for observability.
+// For the initial call it returns the last user message.
+// For tool_result calls it returns the tool results that were fed back to the LLM.
+func formatMessagesAsInput(messages []Message, systemPrompt string) string {
+	if len(messages) == 0 {
+		return systemPrompt
+	}
+
+	// If the last message contains tool results, format them as input
+	last := messages[len(messages)-1]
+	if last.Role == RoleTool && len(last.ToolResults) > 0 {
+		var b strings.Builder
+		for i, tr := range last.ToolResults {
+			if i > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString(tr.Content)
+		}
+		return b.String()
+	}
+
+	// Otherwise return the last user message
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == RoleUser {
+			return messages[i].Content
+		}
+	}
+
+	return systemPrompt
+}
+
+// formatAPICallOutput returns a human-readable output for an API call.
+// When the LLM responds with tool calls instead of text, the content is empty;
+// in that case we describe the tool calls so Langfuse shows a meaningful output.
+func formatAPICallOutput(content string, toolCalls []ToolCall) string {
+	if content != "" {
+		return content
+	}
+	if len(toolCalls) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for i, tc := range toolCalls {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		fmt.Fprintf(&b, "tool_call: %s(%v)", tc.Name, tc.Input)
+	}
+	return b.String()
 }

@@ -71,7 +71,8 @@ func (t *stubTool) Execute(_ context.Context, _ map[string]any) (string, error) 
 
 func newManager(client *stubClient, tools []Tool) (*ConversationManager, *stubUsageReporter) {
 	reporter := &stubUsageReporter{}
-	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, tools, reporter, 2)
+	reporters := []UsageReporter{reporter}
+	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, tools, reporters, 2)
 	return mgr, reporter
 }
 
@@ -280,7 +281,7 @@ func TestConversation_ParallelToolExecution(t *testing.T) {
 
 	// Use maxConcurrentTools = 2 to test concurrency limiting
 	reporter := &stubUsageReporter{}
-	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, []Tool{tool1, tool2, tool3}, reporter, 2)
+	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, []Tool{tool1, tool2, tool3}, []UsageReporter{reporter}, 2)
 
 	answer, err := mgr.Chat(context.Background(), "run parallel tools")
 	if err != nil {
@@ -319,7 +320,7 @@ func TestConversation_SequentialWhenMaxConcurrentIsOne(t *testing.T) {
 
 	// Force sequential execution with maxConcurrentTools = 1
 	reporter := &stubUsageReporter{}
-	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, []Tool{tool1, tool2}, reporter, 1)
+	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, []Tool{tool1, tool2}, []UsageReporter{reporter}, 1)
 
 	answer, err := mgr.Chat(context.Background(), "run sequential tools")
 	if err != nil {
