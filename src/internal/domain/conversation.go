@@ -10,24 +10,29 @@ const maxToolCalls = 5
 // ConversationManager orchestrates a multi-turn conversation with optional tool calls.
 type ConversationManager struct {
 	client         LlmClient
+	modelID        string
 	store          MessageStore
 	promptProvider PromptProvider
 	tools          []Tool
+	reporter       UsageReporter
 }
 
 // NewConversationManager creates a ConversationManager.
-func NewConversationManager(client LlmClient, store MessageStore, pp PromptProvider, tools []Tool) *ConversationManager {
+func NewConversationManager(client LlmClient, modelID string, store MessageStore, pp PromptProvider, tools []Tool, reporter UsageReporter) *ConversationManager {
 	return &ConversationManager{
 		client:         client,
+		modelID:        modelID,
 		store:          store,
 		promptProvider: pp,
 		tools:          tools,
+		reporter:       reporter,
 	}
 }
 
-// SetClient replaces the active LLM client without resetting the conversation history.
-func (m *ConversationManager) SetClient(client LlmClient) {
+// SetClient replaces the active LLM client and model without resetting the conversation history.
+func (m *ConversationManager) SetClient(client LlmClient, modelID string) {
 	m.client = client
+	m.modelID = modelID
 }
 
 // Chat sends a user message and returns the final assistant text response.
@@ -40,15 +45,29 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 
 	m.store.Add(Message{Role: RoleUser, Content: userInput})
 
+	var totalUsage Usage
+	callCount := 0
+	kind := CallKindInitial
+
 	for range maxToolCalls {
-		response, err := m.client.Complete(ctx, systemPrompt, m.store.All(), m.tools)
+		response, usage, err := m.client.Complete(ctx, systemPrompt, m.store.All(), m.tools)
 		if err != nil {
 			return "", fmt.Errorf("model completion: %w", err)
 		}
 
+		m.reporter.OnAPICall(APICallEvent{Model: m.modelID, Kind: kind, Usage: usage})
+		totalUsage = totalUsage.Add(usage)
+		callCount++
+		kind = CallKindToolResult
+
 		m.store.Add(*response)
 
 		if len(response.ToolCalls) == 0 {
+			m.reporter.OnConversationTurn(TurnEvent{
+				Model:      m.modelID,
+				TotalUsage: totalUsage,
+				CallCount:  callCount,
+			})
 			return response.Content, nil
 		}
 

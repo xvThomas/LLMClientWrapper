@@ -28,8 +28,10 @@ func NewClient(apiKey, modelID, baseURL string) *Client {
 	return &Client{sdk: &sdk, modelID: modelID}
 }
 
-// Complete sends the conversation to the OpenAI-compatible API and returns the response.
-func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []domain.Message, tools []domain.Tool) (*domain.Message, error) {
+var _ domain.LlmClient = (*Client)(nil) // ensure Client implements domain.LlmClient
+
+// Complete sends the conversation to the OpenAI-compatible API and returns the response with token usage.
+func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []domain.Message, tools []domain.Tool) (*domain.Message, domain.Usage, error) {
 	params := openai.ChatCompletionNewParams{
 		Model:    openai.ChatModel(c.modelID),
 		Messages: toSDKMessages(systemPrompt, messages),
@@ -41,8 +43,9 @@ func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []d
 
 	resp, err := c.sdk.Chat.Completions.New(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("openai completion: %w", err)
+		return nil, domain.Usage{}, fmt.Errorf("openai completion: %w", err)
 	}
 
-	return fromSDKResponse(resp), nil
+	msg, usage := fromSDKResponse(resp)
+	return msg, usage, nil
 }

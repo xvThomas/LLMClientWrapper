@@ -76,10 +76,15 @@ func toSDKTools(tools []domain.Tool) []openai.ChatCompletionToolParam {
 	return sdkTools
 }
 
-// fromSDKResponse converts an OpenAI SDK response to a domain Message.
-func fromSDKResponse(resp *openai.ChatCompletion) *domain.Message {
+// fromSDKResponse converts an OpenAI SDK response to a domain Message and Usage.
+func fromSDKResponse(resp *openai.ChatCompletion) (*domain.Message, domain.Usage) {
+	usage := domain.Usage{
+		InputTokens:     resp.Usage.PromptTokens,
+		OutputTokens:    resp.Usage.CompletionTokens,
+		CacheReadTokens: resp.Usage.PromptTokensDetails.CachedTokens,
+	}
 	if len(resp.Choices) == 0 {
-		return &domain.Message{Role: domain.RoleAssistant}
+		return &domain.Message{Role: domain.RoleAssistant}, usage
 	}
 	choice := resp.Choices[0].Message
 	msg := &domain.Message{
@@ -95,5 +100,5 @@ func fromSDKResponse(resp *openai.ChatCompletion) *domain.Message {
 			Input: input,
 		})
 	}
-	return msg
+	return msg, usage
 }

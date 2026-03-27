@@ -9,26 +9,40 @@ import (
 // stubClient is a controllable LlmClient for tests.
 type stubClient struct {
 	responses []*Message
+	usages    []Usage // parallel slice; zero value used when shorter
 	callCount int
 }
 
-func (s *stubClient) Complete(_ context.Context, _ string, _ []Message, _ []Tool) (*Message, error) {
+func (s *stubClient) Complete(_ context.Context, _ string, _ []Message, _ []Tool) (*Message, Usage, error) {
 	if s.callCount >= len(s.responses) {
-		return nil, errors.New("stub: no more responses")
+		return nil, Usage{}, errors.New("stub: no more responses")
 	}
 	resp := s.responses[s.callCount]
+	var usage Usage
+	if s.callCount < len(s.usages) {
+		usage = s.usages[s.callCount]
+	}
 	s.callCount++
-	return resp, nil
+	return resp, usage, nil
 }
+
+// stubUsageReporter records every event emitted by ConversationManager.
+type stubUsageReporter struct {
+	apiCalls []APICallEvent
+	turns    []TurnEvent
+}
+
+func (r *stubUsageReporter) OnAPICall(e APICallEvent)       { r.apiCalls = append(r.apiCalls, e) }
+func (r *stubUsageReporter) OnConversationTurn(e TurnEvent) { r.turns = append(r.turns, e) }
 
 // stubStore is a simple in-memory MessageStore for tests.
 type stubStore struct {
 	messages []Message
 }
 
-func (s *stubStore) Add(msg Message)    { s.messages = append(s.messages, msg) }
-func (s *stubStore) All() []Message    { return s.messages }
-func (s *stubStore) Clear()            { s.messages = nil }
+func (s *stubStore) Add(msg Message) { s.messages = append(s.messages, msg) }
+func (s *stubStore) All() []Message  { return s.messages }
+func (s *stubStore) Clear()          { s.messages = nil }
 
 // stubPromptProvider returns a fixed system prompt.
 type stubPromptProvider struct{ text string }
@@ -45,9 +59,9 @@ type stubTool struct {
 	called int
 }
 
-func (t *stubTool) Name() string                      { return t.name }
-func (t *stubTool) Description() string               { return "stub tool" }
-func (t *stubTool) Parameters() map[string]any        { return map[string]any{} }
+func (t *stubTool) Name() string               { return t.name }
+func (t *stubTool) Description() string        { return "stub tool" }
+func (t *stubTool) Parameters() map[string]any { return map[string]any{} }
 func (t *stubTool) Execute(_ context.Context, _ map[string]any) (string, error) {
 	t.called++
 	return t.result, t.err
@@ -55,11 +69,17 @@ func (t *stubTool) Execute(_ context.Context, _ map[string]any) (string, error) 
 
 // --- tests ---
 
+func newManager(client *stubClient, tools []Tool) (*ConversationManager, *stubUsageReporter) {
+	reporter := &stubUsageReporter{}
+	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, tools, reporter)
+	return mgr, reporter
+}
+
 func TestConversation_NoToolCall(t *testing.T) {
 	client := &stubClient{responses: []*Message{
 		{Role: RoleAssistant, Content: "Hello!"},
 	}}
-	mgr := NewConversationManager(client, &stubStore{}, &stubPromptProvider{"system"}, nil)
+	mgr, _ := newManager(client, nil)
 
 	answer, err := mgr.Chat(context.Background(), "Hi")
 	if err != nil {
@@ -74,12 +94,12 @@ func TestConversation_SingleToolCall(t *testing.T) {
 	tool := &stubTool{name: "get_current_weather", result: "20°C, sunny"}
 	client := &stubClient{responses: []*Message{
 		{
-			Role: RoleAssistant,
+			Role:      RoleAssistant,
 			ToolCalls: []ToolCall{{ID: "1", Name: "get_current_weather", Input: map[string]any{"city": "Paris"}}},
 		},
 		{Role: RoleAssistant, Content: "It is 20°C and sunny in Paris."},
 	}}
-	mgr := NewConversationManager(client, &stubStore{}, &stubPromptProvider{"system"}, []Tool{tool})
+	mgr, _ := newManager(client, []Tool{tool})
 
 	answer, err := mgr.Chat(context.Background(), "Weather in Paris?")
 	if err != nil {
@@ -103,7 +123,7 @@ func TestConversation_MaxToolCallsExceeded(t *testing.T) {
 		}
 	}
 	client := &stubClient{responses: responses}
-	mgr := NewConversationManager(client, &stubStore{}, &stubPromptProvider{"system"}, []Tool{tool})
+	mgr, _ := newManager(client, []Tool{tool})
 
 	_, err := mgr.Chat(context.Background(), "loop?")
 	if err == nil {
@@ -118,10 +138,124 @@ func TestConversation_UnknownToolReturnsError(t *testing.T) {
 			ToolCalls: []ToolCall{{ID: "1", Name: "nonexistent", Input: map[string]any{}}},
 		},
 	}}
-	mgr := NewConversationManager(client, &stubStore{}, &stubPromptProvider{"system"}, nil)
+	mgr, _ := newManager(client, nil)
 
 	_, err := mgr.Chat(context.Background(), "call unknown tool")
 	if err == nil {
 		t.Error("expected error for unknown tool")
+	}
+}
+
+// --- usage reporter tests ---
+
+func TestUsage_OnAPICallFiredPerComplete(t *testing.T) {
+	tool := &stubTool{name: "weather", result: "sunny"}
+	client := &stubClient{
+		responses: []*Message{
+			{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "1", Name: "weather", Input: map[string]any{}}}},
+			{Role: RoleAssistant, Content: "It is sunny."},
+		},
+		usages: []Usage{
+			{InputTokens: 10, OutputTokens: 5},
+			{InputTokens: 20, OutputTokens: 8},
+		},
+	}
+	mgr, reporter := newManager(client, []Tool{tool})
+
+	_, err := mgr.Chat(context.Background(), "weather?")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(reporter.apiCalls) != 2 {
+		t.Fatalf("expected 2 OnAPICall events, got %d", len(reporter.apiCalls))
+	}
+	if reporter.apiCalls[0].Kind != CallKindInitial {
+		t.Errorf("first call kind: got %q, want %q", reporter.apiCalls[0].Kind, CallKindInitial)
+	}
+	if reporter.apiCalls[1].Kind != CallKindToolResult {
+		t.Errorf("second call kind: got %q, want %q", reporter.apiCalls[1].Kind, CallKindToolResult)
+	}
+	if reporter.apiCalls[0].Usage.InputTokens != 10 {
+		t.Errorf("first call input tokens: got %d, want 10", reporter.apiCalls[0].Usage.InputTokens)
+	}
+	if reporter.apiCalls[1].Usage.InputTokens != 20 {
+		t.Errorf("second call input tokens: got %d, want 20", reporter.apiCalls[1].Usage.InputTokens)
+	}
+}
+
+func TestUsage_OnConversationTurnAggregatesUsage(t *testing.T) {
+	tool := &stubTool{name: "weather", result: "sunny"}
+	client := &stubClient{
+		responses: []*Message{
+			{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "1", Name: "weather", Input: map[string]any{}}}},
+			{Role: RoleAssistant, Content: "It is sunny."},
+		},
+		usages: []Usage{
+			{InputTokens: 10, OutputTokens: 5, CacheReadTokens: 2, CacheWriteTokens: 3},
+			{InputTokens: 20, OutputTokens: 8},
+		},
+	}
+	mgr, reporter := newManager(client, []Tool{tool})
+
+	_, err := mgr.Chat(context.Background(), "weather?")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(reporter.turns) != 1 {
+		t.Fatalf("expected 1 OnConversationTurn event, got %d", len(reporter.turns))
+	}
+	turn := reporter.turns[0]
+	if turn.CallCount != 2 {
+		t.Errorf("call count: got %d, want 2", turn.CallCount)
+	}
+	if turn.TotalUsage.InputTokens != 30 {
+		t.Errorf("total input tokens: got %d, want 30", turn.TotalUsage.InputTokens)
+	}
+	if turn.TotalUsage.OutputTokens != 13 {
+		t.Errorf("total output tokens: got %d, want 13", turn.TotalUsage.OutputTokens)
+	}
+	if turn.TotalUsage.CacheReadTokens != 2 {
+		t.Errorf("total cache read tokens: got %d, want 2", turn.TotalUsage.CacheReadTokens)
+	}
+	if turn.Model != "test-model" {
+		t.Errorf("model: got %q, want %q", turn.Model, "test-model")
+	}
+}
+
+func TestUsage_NoToolCall_SingleAPICallEvent(t *testing.T) {
+	client := &stubClient{
+		responses: []*Message{{Role: RoleAssistant, Content: "Hi!"}},
+		usages:    []Usage{{InputTokens: 5, OutputTokens: 3}},
+	}
+	mgr, reporter := newManager(client, nil)
+
+	_, err := mgr.Chat(context.Background(), "Hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(reporter.apiCalls) != 1 {
+		t.Fatalf("expected 1 api call event, got %d", len(reporter.apiCalls))
+	}
+	if reporter.apiCalls[0].Kind != CallKindInitial {
+		t.Errorf("expected CallKindInitial, got %q", reporter.apiCalls[0].Kind)
+	}
+	if len(reporter.turns) != 1 {
+		t.Fatalf("expected 1 turn event, got %d", len(reporter.turns))
+	}
+	if reporter.turns[0].TotalUsage.InputTokens != 5 {
+		t.Errorf("turn input tokens: got %d, want 5", reporter.turns[0].TotalUsage.InputTokens)
+	}
+}
+
+func TestUsage_Add(t *testing.T) {
+	a := Usage{InputTokens: 10, OutputTokens: 5, CacheReadTokens: 2, CacheWriteTokens: 3}
+	b := Usage{InputTokens: 7, OutputTokens: 4, CacheReadTokens: 1, CacheWriteTokens: 0}
+	got := a.Add(b)
+	expected := Usage{InputTokens: 17, OutputTokens: 9, CacheReadTokens: 3, CacheWriteTokens: 3}
+	if got != expected {
+		t.Errorf("Usage.Add: got %+v, want %+v", got, expected)
 	}
 }

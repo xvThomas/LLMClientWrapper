@@ -44,6 +44,9 @@ func toToolResultParam(msg domain.Message) anthropic.MessageParam {
 }
 
 // toSDKTools converts domain tools to Anthropic SDK tool definitions.
+// The last tool is marked with cache_control so that the prompt cache covers
+// the system prompt + all tool definitions (Anthropic caches everything up to
+// the last cache breakpoint).
 func toSDKTools(tools []domain.Tool) []anthropic.ToolUnionParam {
 	sdkTools := make([]anthropic.ToolUnionParam, 0, len(tools))
 	for _, t := range tools {
@@ -62,15 +65,18 @@ func toSDKTools(tools []domain.Tool) []anthropic.ToolUnionParam {
 			},
 			t.Name(),
 		))
-		// set description via direct struct field — ToolUnionParamOfTool returns a
-		// ToolUnionParam whose OfTool pointer we can mutate.
 		sdkTools[len(sdkTools)-1].OfTool.Description = anthropic.String(t.Description())
+	}
+	// Place a cache breakpoint on the last tool so the entire prefix
+	// (system prompt + tools) is eligible for prompt caching.
+	if len(sdkTools) > 0 {
+		sdkTools[len(sdkTools)-1].OfTool.CacheControl = anthropic.NewCacheControlEphemeralParam()
 	}
 	return sdkTools
 }
 
-// fromSDKResponse converts an Anthropic SDK response to a domain Message.
-func fromSDKResponse(resp *anthropic.Message) *domain.Message {
+// fromSDKResponse converts an Anthropic SDK response to a domain Message and Usage.
+func fromSDKResponse(resp *anthropic.Message) (*domain.Message, domain.Usage) {
 	msg := &domain.Message{Role: domain.RoleAssistant}
 	for _, block := range resp.Content {
 		switch block.Type {
@@ -86,7 +92,13 @@ func fromSDKResponse(resp *anthropic.Message) *domain.Message {
 			})
 		}
 	}
-	return msg
+	usage := domain.Usage{
+		InputTokens:      resp.Usage.InputTokens,
+		OutputTokens:     resp.Usage.OutputTokens,
+		CacheReadTokens:  resp.Usage.CacheReadInputTokens,
+		CacheWriteTokens: resp.Usage.CacheCreationInputTokens,
+	}
+	return msg, usage
 }
 
 // toSystemPrompt wraps the system prompt string with ephemeral cache control.

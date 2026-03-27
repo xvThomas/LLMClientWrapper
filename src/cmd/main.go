@@ -83,7 +83,7 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 	tools := infratools.New(cfg).All()
 
 	store := memory.NewStore()
-	manager := domain.NewConversationManager(client, store, pp, tools)
+	manager := domain.NewConversationManager(client, modelAlias, store, pp, tools, ConsoleUsageReporter{})
 	currentModel := modelAlias
 
 	fmt.Print(cyan(bold+"Session started."+reset) + `
@@ -224,7 +224,7 @@ func cmdModel(r *router.Router, manager *domain.ConversationManager, currentMode
 		fmt.Fprintln(os.Stderr, red("Error building client: ")+err.Error())
 		return
 	}
-	manager.SetClient(client)
+	manager.SetClient(client, string(selected))
 	*currentModel = string(selected)
 	fmt.Printf("Switched to %s.\n", green(string(selected)))
 }

@@ -15,14 +15,16 @@ type Client struct {
 	modelID string
 }
 
+var _ domain.LlmClient = (*Client)(nil) // ensure Client implements domain.LlmClient
+
 // NewClient creates an Anthropic Client.
 func NewClient(apiKey, modelID string) *Client {
 	sdk := anthropic.NewClient(option.WithAPIKey(apiKey))
 	return &Client{sdk: &sdk, modelID: modelID}
 }
 
-// Complete sends the conversation to Anthropic and returns the assistant response.
-func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []domain.Message, tools []domain.Tool) (*domain.Message, error) {
+// Complete sends the conversation to Anthropic and returns the assistant response with token usage.
+func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []domain.Message, tools []domain.Tool) (*domain.Message, domain.Usage, error) {
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.modelID),
 		MaxTokens: 4096,
@@ -39,8 +41,9 @@ func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []d
 
 	resp, err := c.sdk.Messages.New(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("anthropic completion: %w", err)
+		return nil, domain.Usage{}, fmt.Errorf("anthropic completion: %w", err)
 	}
 
-	return fromSDKResponse(resp), nil
+	msg, usage := fromSDKResponse(resp)
+	return msg, usage, nil
 }
