@@ -80,6 +80,11 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 		return err
 	}
 
+	modelDescriptor, err := domain.Lookup(domain.Model(modelAlias))
+	if err != nil {
+		return err
+	}
+
 	pp := buildPromptProvider(systemFile)
 	tools := infratools.New(cfg).All()
 
@@ -110,7 +115,7 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 		reporters = append(reporters, &usage.ConsoleUsageReporter{})
 	}
 
-	manager := domain.NewConversationManager(client, modelAlias, store, pp, tools, reporters, cfg.ToolsMaxConcurrent)
+	manager := domain.NewConversationManager(client, modelAlias, modelDescriptor.Provider, store, pp, tools, reporters, cfg.ToolsMaxConcurrent)
 	currentModel := modelAlias
 
 	fmt.Print(cyan(bold+"Session started."+reset) + `

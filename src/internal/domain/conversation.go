@@ -14,6 +14,7 @@ const maxToolCalls = 5
 type ConversationManager struct {
 	client             LlmClient
 	modelID            string
+	provider           Provider
 	store              MessageStore
 	promptProvider     PromptProvider
 	tools              []Tool
@@ -22,10 +23,11 @@ type ConversationManager struct {
 }
 
 // NewConversationManager creates a ConversationManager.
-func NewConversationManager(client LlmClient, modelID string, store MessageStore, pp PromptProvider, tools []Tool, reporters []UsageReporter, maxConcurrentTools int) *ConversationManager {
+func NewConversationManager(client LlmClient, modelID string, provider Provider, store MessageStore, pp PromptProvider, tools []Tool, reporters []UsageReporter, maxConcurrentTools int) *ConversationManager {
 	return &ConversationManager{
 		client:             client,
 		modelID:            modelID,
+		provider:           provider,
 		store:              store,
 		promptProvider:     pp,
 		tools:              tools,
@@ -119,6 +121,7 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 		m.reportAPICall(APICallEvent{
 			TraceID:      turnTraceID,
 			ParentSpanID: turnSpanID,
+			Provider:     m.provider,
 			StartedAt:    callStartedAt,
 			EndedAt:      lastCallEndedAt,
 			Model:        m.modelID,

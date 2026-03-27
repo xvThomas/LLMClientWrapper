@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"llmclientwrapper/src/internal/domain"
 )
@@ -103,15 +102,8 @@ func (l *LangfuseUsageReporter) apiCallToOTLP(event domain.APICallEvent) (*OTLPT
 	spanID := generateSpanID()
 	parentSpanID := event.ParentSpanID
 
-	// Determine system based on model name
-	system := "unknown"
-	if contains(event.Model, "claude") || contains(event.Model, "haiku") || contains(event.Model, "sonnet") {
-		system = "anthropic"
-	} else if contains(event.Model, "gpt") {
-		system = "openai"
-	} else if contains(event.Model, "mistral") {
-		system = "mistral"
-	}
+	// Provider constants are defined to match OTel GenAI semantic conventions directly.
+	system := string(event.Provider)
 
 	attributes := []OTLPAttribute{
 		// GenAI semantic conventions
@@ -253,9 +245,4 @@ func (l *LangfuseUsageReporter) conversationTurnToOTLP(event domain.TurnEvent) (
 	}
 
 	return &OTLPTrace{Span: span}, nil
-}
-
-// contains is a helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
