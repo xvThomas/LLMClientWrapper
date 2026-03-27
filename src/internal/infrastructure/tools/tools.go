@@ -16,9 +16,10 @@ func New(cfg *config.Config) *Tools {
 	return &Tools{cfg: cfg}
 }
 
-// All returns the list of all registered tools.
+// All returns the list of all registered tools as type-erased Tool handlers.
 func (t *Tools) All() []domain.Tool {
+	w := weather.NewOpenWeatherMapTool(t.cfg.OpenWeatherMapAPIKey)
 	return []domain.Tool{
-		weather.NewTool(t.cfg.OpenWeatherMapAPIKey),
+		domain.Adapt(w, w.Parameters),
 	}
 }

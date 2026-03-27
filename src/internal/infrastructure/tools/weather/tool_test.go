@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
-func TestTool_Metadata(t *testing.T) {
-	tool := NewTool("key")
+func TestOpenWeatherMapTool_Metadata(t *testing.T) {
+	tool := NewOpenWeatherMapTool("key")
 	if tool.Name() != "get_current_weather" {
 		t.Errorf("unexpected tool name: %q", tool.Name())
 	}
@@ -23,7 +22,7 @@ func TestTool_Metadata(t *testing.T) {
 	}
 }
 
-func TestTool_Execute_Success(t *testing.T) {
+func TestOpenWeatherMapTool_Call_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := weatherResponse{Name: "Paris"}
 		resp.Main.Temp = 18.5
@@ -35,32 +34,38 @@ func TestTool_Execute_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tool := newToolWithBaseURL("testkey", srv.URL, srv.Client())
-	result, err := tool.Execute(context.Background(), map[string]any{"city": "Paris"})
+	tool := newOpenWeatherMapToolWithBaseURL("testkey", srv.URL, srv.Client())
+	result, err := tool.Call(context.Background(), OpenWeatherMapToolInput{City: "Paris"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(result, "Paris") || !strings.Contains(result, "18.5") {
-		t.Errorf("unexpected result: %q", result)
+	if result.Name != "Paris" {
+		t.Errorf("expected Name %q, got %q", "Paris", result.Name)
+	}
+	if result.Temp != 18.5 {
+		t.Errorf("expected Temp 18.5, got %f", result.Temp)
+	}
+	if len(result.Descriptions) != 1 || result.Descriptions[0] != "clear sky" {
+		t.Errorf("unexpected descriptions: %v", result.Descriptions)
 	}
 }
 
-func TestTool_Execute_MissingCity(t *testing.T) {
-	tool := NewTool("key")
-	_, err := tool.Execute(context.Background(), map[string]any{})
+func TestOpenWeatherMapTool_Call_EmptyCity(t *testing.T) {
+	tool := NewOpenWeatherMapTool("key")
+	_, err := tool.Call(context.Background(), OpenWeatherMapToolInput{City: ""})
 	if err == nil {
-		t.Error("expected error for missing city parameter")
+		t.Error("expected error for empty city")
 	}
 }
 
-func TestTool_Execute_APIError(t *testing.T) {
+func TestOpenWeatherMapTool_Call_APIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
 	defer srv.Close()
 
-	tool := newToolWithBaseURL("badkey", srv.URL, srv.Client())
-	_, err := tool.Execute(context.Background(), map[string]any{"city": "Paris"})
+	tool := newOpenWeatherMapToolWithBaseURL("badkey", srv.URL, srv.Client())
+	_, err := tool.Call(context.Background(), OpenWeatherMapToolInput{City: "Paris"})
 	if err == nil {
 		t.Error("expected error for non-200 API response")
 	}

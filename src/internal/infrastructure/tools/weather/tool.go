@@ -11,35 +11,47 @@ import (
 
 const defaultBaseURL = "https://api.openweathermap.org/data/2.5"
 
-// Tool implements domain.Tool for fetching current weather via OpenWeatherMap.
-type Tool struct {
+// OpenWeatherMapToolInput is the typed input for OpenWeatherMapTool.
+type OpenWeatherMapToolInput struct {
+	City string `json:"city"`
+}
+
+// OpenWeatherMapToolOutput is the typed output for OpenWeatherMapTool.
+type OpenWeatherMapToolOutput struct {
+	Name         string   `json:"name"`
+	Temp         float64  `json:"temp"`
+	Descriptions []string `json:"descriptions"`
+}
+
+// OpenWeatherMapTool implements domain.TypedTool for fetching current weather via OpenWeatherMap.
+type OpenWeatherMapTool struct {
 	apiKey  string
 	baseURL string
 	http    *http.Client
 }
 
-// NewTool creates a WeatherTool with the given API key.
-func NewTool(apiKey string) *Tool {
-	return &Tool{apiKey: apiKey, baseURL: defaultBaseURL, http: &http.Client{}}
+// NewOpenWeatherMapTool creates an OpenWeatherMapTool with the given API key.
+func NewOpenWeatherMapTool(apiKey string) *OpenWeatherMapTool {
+	return &OpenWeatherMapTool{apiKey: apiKey, baseURL: defaultBaseURL, http: &http.Client{}}
 }
 
-var _ domain.Tool = (*Tool)(nil) // ensure Tool implements domain.Tool
+var _ domain.TypedTool[OpenWeatherMapToolInput, OpenWeatherMapToolOutput] = (*OpenWeatherMapTool)(nil)
 
-// newToolWithBaseURL creates a WeatherTool with a custom base URL (for testing).
-func newToolWithBaseURL(apiKey, baseURL string, client *http.Client) *Tool {
-	return &Tool{apiKey: apiKey, baseURL: baseURL, http: client}
+// newOpenWeatherMapToolWithBaseURL creates an OpenWeatherMapTool with a custom base URL (for testing).
+func newOpenWeatherMapToolWithBaseURL(apiKey, baseURL string, client *http.Client) *OpenWeatherMapTool {
+	return &OpenWeatherMapTool{apiKey: apiKey, baseURL: baseURL, http: client}
 }
 
 // Name returns the tool name as expected by the model.
-func (t *Tool) Name() string { return "get_current_weather" }
+func (t *OpenWeatherMapTool) Name() string { return "get_current_weather" }
 
 // Description describes what the tool does.
-func (t *Tool) Description() string {
-	return "Get the current weather for a given city. Returns temperature in Celsius and weather description."
+func (t *OpenWeatherMapTool) Description() string {
+	return "Get the current weather for a given city. Returns temperature in Celsius and weather descriptions."
 }
 
 // Parameters returns the JSON Schema for the tool input.
-func (t *Tool) Parameters() map[string]any {
+func (t *OpenWeatherMapTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -52,31 +64,26 @@ func (t *Tool) Parameters() map[string]any {
 	}
 }
 
-// Execute calls the OpenWeatherMap API and returns a formatted weather string.
-func (t *Tool) Execute(ctx context.Context, input map[string]any) (string, error) {
-	city, err := extractCity(input)
+// Call calls the OpenWeatherMap API and returns a typed output struct.
+func (t *OpenWeatherMapTool) Call(ctx context.Context, input OpenWeatherMapToolInput) (OpenWeatherMapToolOutput, error) {
+	if input.City == "" {
+		return OpenWeatherMapToolOutput{}, fmt.Errorf("parameter 'city' must be a non-empty string")
+	}
+
+	data, err := t.fetchWeather(ctx, input.City)
 	if err != nil {
-		return "", err
+		return OpenWeatherMapToolOutput{}, err
 	}
 
-	data, err := t.fetchWeather(ctx, city)
-	if err != nil {
-		return "", err
+	descs := make([]string, 0, len(data.Weather))
+	for _, w := range data.Weather {
+		descs = append(descs, w.Description)
 	}
-
-	return formatWeather(data), nil
-}
-
-func extractCity(input map[string]any) (string, error) {
-	raw, ok := input["city"]
-	if !ok {
-		return "", fmt.Errorf("missing required parameter 'city'")
-	}
-	city, ok := raw.(string)
-	if !ok || city == "" {
-		return "", fmt.Errorf("parameter 'city' must be a non-empty string")
-	}
-	return city, nil
+	return OpenWeatherMapToolOutput{
+		Name:         data.Name,
+		Temp:         data.Main.Temp,
+		Descriptions: descs,
+	}, nil
 }
 
 type weatherResponse struct {
@@ -89,7 +96,7 @@ type weatherResponse struct {
 	} `json:"weather"`
 }
 
-func (t *Tool) fetchWeather(ctx context.Context, city string) (*weatherResponse, error) {
+func (t *OpenWeatherMapTool) fetchWeather(ctx context.Context, city string) (*weatherResponse, error) {
 	endpoint := fmt.Sprintf("%s/weather?q=%s&appid=%s&units=metric",
 		t.baseURL, url.QueryEscape(city), t.apiKey)
 
@@ -113,12 +120,4 @@ func (t *Tool) fetchWeather(ctx context.Context, city string) (*weatherResponse,
 		return nil, fmt.Errorf("decoding weather response: %w", err)
 	}
 	return &data, nil
-}
-
-func formatWeather(data *weatherResponse) string {
-	desc := ""
-	if len(data.Weather) > 0 {
-		desc = data.Weather[0].Description
-	}
-	return fmt.Sprintf("Weather in %s: %.1f°C, %s", data.Name, data.Main.Temp, desc)
 }

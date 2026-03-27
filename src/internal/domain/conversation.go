@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -273,7 +274,7 @@ func formatMessagesAsInput(messages []Message, systemPrompt string) string {
 
 // formatAPICallOutput returns a human-readable output for an API call.
 // When the LLM responds with tool calls instead of text, the content is empty;
-// in that case we describe the tool calls so Langfuse shows a meaningful output.
+// in that case we format the tool calls as JSON so Langfuse shows a meaningful output.
 func formatAPICallOutput(content string, toolCalls []ToolCall) string {
 	if content != "" {
 		return content
@@ -286,7 +287,15 @@ func formatAPICallOutput(content string, toolCalls []ToolCall) string {
 		if i > 0 {
 			b.WriteString("\n")
 		}
-		fmt.Fprintf(&b, "tool_call: %s(%v)", tc.Name, tc.Input)
+		fmt.Fprintf(&b, `{"tool_name": %q, "input": %s}`, tc.Name, marshalInput(tc.Input))
 	}
 	return b.String()
+}
+
+func marshalInput(input map[string]any) string {
+	raw, err := json.Marshal(input)
+	if err != nil {
+		return "{}"
+	}
+	return string(raw)
 }
