@@ -71,7 +71,7 @@ func (t *stubTool) Execute(_ context.Context, _ map[string]any) (string, error) 
 
 func newManager(client *stubClient, tools []Tool) (*ConversationManager, *stubUsageReporter) {
 	reporter := &stubUsageReporter{}
-	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, tools, reporter)
+	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, tools, reporter, 2)
 	return mgr, reporter
 }
 
@@ -257,5 +257,80 @@ func TestUsage_Add(t *testing.T) {
 	expected := Usage{InputTokens: 17, OutputTokens: 9, CacheReadTokens: 3, CacheWriteTokens: 3}
 	if got != expected {
 		t.Errorf("Usage.Add: got %+v, want %+v", got, expected)
+	}
+}
+
+func TestConversation_ParallelToolExecution(t *testing.T) {
+	// Setup multiple tools to test parallel execution
+	tool1 := &stubTool{name: "tool1", result: "result1"}
+	tool2 := &stubTool{name: "tool2", result: "result2"}
+	tool3 := &stubTool{name: "tool3", result: "result3"}
+
+	client := &stubClient{responses: []*Message{
+		{
+			Role: RoleAssistant,
+			ToolCalls: []ToolCall{
+				{ID: "1", Name: "tool1", Input: map[string]any{}},
+				{ID: "2", Name: "tool2", Input: map[string]any{}},
+				{ID: "3", Name: "tool3", Input: map[string]any{}},
+			},
+		},
+		{Role: RoleAssistant, Content: "All tools executed."},
+	}}
+
+	// Use maxConcurrentTools = 2 to test concurrency limiting
+	reporter := &stubUsageReporter{}
+	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, []Tool{tool1, tool2, tool3}, reporter, 2)
+
+	answer, err := mgr.Chat(context.Background(), "run parallel tools")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if answer != "All tools executed." {
+		t.Errorf("unexpected answer: %q", answer)
+	}
+
+	// Verify all tools were called exactly once
+	if tool1.called != 1 {
+		t.Errorf("tool1 should be called once, got %d", tool1.called)
+	}
+	if tool2.called != 1 {
+		t.Errorf("tool2 should be called once, got %d", tool2.called)
+	}
+	if tool3.called != 1 {
+		t.Errorf("tool3 should be called once, got %d", tool3.called)
+	}
+}
+
+func TestConversation_SequentialWhenMaxConcurrentIsOne(t *testing.T) {
+	tool1 := &stubTool{name: "tool1", result: "result1"}
+	tool2 := &stubTool{name: "tool2", result: "result2"}
+
+	client := &stubClient{responses: []*Message{
+		{
+			Role: RoleAssistant,
+			ToolCalls: []ToolCall{
+				{ID: "1", Name: "tool1", Input: map[string]any{}},
+				{ID: "2", Name: "tool2", Input: map[string]any{}},
+			},
+		},
+		{Role: RoleAssistant, Content: "Sequential execution."},
+	}}
+
+	// Force sequential execution with maxConcurrentTools = 1
+	reporter := &stubUsageReporter{}
+	mgr := NewConversationManager(client, "test-model", &stubStore{}, &stubPromptProvider{"system"}, []Tool{tool1, tool2}, reporter, 1)
+
+	answer, err := mgr.Chat(context.Background(), "run sequential tools")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if answer != "Sequential execution." {
+		t.Errorf("unexpected answer: %q", answer)
+	}
+
+	// Verify tools were called
+	if tool1.called != 1 || tool2.called != 1 {
+		t.Errorf("both tools should be called once, got tool1=%d tool2=%d", tool1.called, tool2.called)
 	}
 }

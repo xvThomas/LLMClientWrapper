@@ -61,12 +61,13 @@ Type `exit` or `quit` (or press `Ctrl+C`) to end the session.
 
 Copy `.env.example` to `.env` and fill in the relevant keys:
 
-| Variable                 | Required for              |
-| ------------------------ | ------------------------- |
-| `ANTHROPIC_API_KEY`      | `haiku-4.5`, `sonnet-4.6` |
-| `OPENAI_API_KEY`         | `gpt-5.4`                 |
-| `MISTRAL_API_KEY`        | `mistral-small`           |
-| `OPENWEATHERMAP_API_KEY` | weather tool calls        |
+| Variable                 | Required for              | Default | Description                                                  |
+| ------------------------ | ------------------------- | ------- | ------------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`      | `haiku-4.5`, `sonnet-4.6` | -       | API key for Anthropic models                                 |
+| `OPENAI_API_KEY`         | `gpt-5.4`                 | -       | API key for OpenAI models                                    |
+| `MISTRAL_API_KEY`        | `mistral-small`           | -       | API key for Mistral models                                   |
+| `OPENWEATHERMAP_API_KEY` | weather tool calls        | -       | API key for OpenWeatherMap weather tool                      |
+| `TOOLS_MAX_CONCURRENT`   | optional                  | `4`     | Maximum concurrent tool executions (set to 1 for sequential) |
 
 ---
 

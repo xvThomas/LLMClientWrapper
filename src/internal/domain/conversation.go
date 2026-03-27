@@ -3,29 +3,32 @@ package domain
 import (
 	"context"
 	"fmt"
+	"sync"
 )
 
 const maxToolCalls = 5
 
 // ConversationManager orchestrates a multi-turn conversation with optional tool calls.
 type ConversationManager struct {
-	client         LlmClient
-	modelID        string
-	store          MessageStore
-	promptProvider PromptProvider
-	tools          []Tool
-	reporter       UsageReporter
+	client             LlmClient
+	modelID            string
+	store              MessageStore
+	promptProvider     PromptProvider
+	tools              []Tool
+	reporter           UsageReporter
+	maxConcurrentTools int // Maximum concurrent tool executions
 }
 
 // NewConversationManager creates a ConversationManager.
-func NewConversationManager(client LlmClient, modelID string, store MessageStore, pp PromptProvider, tools []Tool, reporter UsageReporter) *ConversationManager {
+func NewConversationManager(client LlmClient, modelID string, store MessageStore, pp PromptProvider, tools []Tool, reporter UsageReporter, maxConcurrentTools int) *ConversationManager {
 	return &ConversationManager{
-		client:         client,
-		modelID:        modelID,
-		store:          store,
-		promptProvider: pp,
-		tools:          tools,
-		reporter:       reporter,
+		client:             client,
+		modelID:            modelID,
+		store:              store,
+		promptProvider:     pp,
+		tools:              tools,
+		reporter:           reporter,
+		maxConcurrentTools: maxConcurrentTools,
 	}
 }
 
@@ -80,6 +83,15 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 }
 
 func (m *ConversationManager) executeToolCalls(ctx context.Context, calls []ToolCall) error {
+	if len(calls) == 1 || m.maxConcurrentTools <= 1 {
+		// Execute sequentially for single calls or when concurrency is disabled
+		return m.executeToolCallsSequential(ctx, calls)
+	}
+	// Execute in parallel with concurrency limit
+	return m.executeToolCallsParallel(ctx, calls)
+}
+
+func (m *ConversationManager) executeToolCallsSequential(ctx context.Context, calls []ToolCall) error {
 	results := make([]ToolResult, 0, len(calls))
 
 	for _, call := range calls {
@@ -88,6 +100,45 @@ func (m *ConversationManager) executeToolCalls(ctx context.Context, calls []Tool
 			return err
 		}
 		results = append(results, result)
+	}
+
+	m.store.Add(Message{Role: RoleTool, ToolResults: results})
+	return nil
+}
+
+func (m *ConversationManager) executeToolCallsParallel(ctx context.Context, calls []ToolCall) error {
+	results := make([]ToolResult, len(calls))
+	errors := make([]error, len(calls))
+
+	// Limit concurrency using a semaphore pattern
+	sem := make(chan struct{}, m.maxConcurrentTools)
+	var wg sync.WaitGroup
+
+	for i, call := range calls {
+		wg.Add(1)
+		go func(idx int, toolCall ToolCall) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			result, err := m.executeTool(ctx, toolCall)
+			if err != nil {
+				errors[idx] = err
+				return
+			}
+			results[idx] = result
+		}(i, call)
+	}
+
+	wg.Wait()
+
+	// Check for any errors and return the first one found
+	for i, err := range errors {
+		if err != nil {
+			return fmt.Errorf("tool %q failed: %w", calls[i].Name, err)
+		}
 	}
 
 	m.store.Add(Message{Role: RoleTool, ToolResults: results})

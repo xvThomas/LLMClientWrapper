@@ -83,7 +83,7 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 	tools := infratools.New(cfg).All()
 
 	store := memory.NewStore()
-	manager := domain.NewConversationManager(client, modelAlias, store, pp, tools, ConsoleUsageReporter{})
+	manager := domain.NewConversationManager(client, modelAlias, store, pp, tools, ConsoleUsageReporter{}, cfg.ToolsMaxConcurrent)
 	currentModel := modelAlias
 
 	fmt.Print(cyan(bold+"Session started."+reset) + `
