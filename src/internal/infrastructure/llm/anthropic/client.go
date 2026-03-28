@@ -9,22 +9,22 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-// Client implements domain.LlmClient using the Anthropic API.
-type Client struct {
+// AnthropicClient implements domain.LlmClient using the Anthropic API.
+type AnthropicClient struct {
 	sdk     *anthropic.Client
 	modelID string
 }
 
-var _ domain.LlmClient = (*Client)(nil) // ensure Client implements domain.LlmClient
+var _ domain.LlmClient = (*AnthropicClient)(nil) // ensure AnthropicClient implements domain.LlmClient
 
-// NewClient creates an Anthropic Client.
-func NewClient(apiKey, modelID string) *Client {
+// NewAnthropicClient creates an Anthropic Client.
+func NewAnthropicClient(apiKey, modelID string) *AnthropicClient {
 	sdk := anthropic.NewClient(option.WithAPIKey(apiKey))
-	return &Client{sdk: &sdk, modelID: modelID}
+	return &AnthropicClient{sdk: &sdk, modelID: modelID}
 }
 
 // Complete sends the conversation to Anthropic and returns the assistant response with token usage.
-func (c *Client) Complete(ctx context.Context, systemPrompt string, messages []domain.Message, tools []domain.Tool) (*domain.Message, domain.Usage, error) {
+func (c *AnthropicClient) Complete(ctx context.Context, systemPrompt string, messages []domain.Message, tools []domain.Tool) (*domain.Message, domain.Usage, error) {
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.modelID),
 		MaxTokens: 4096,

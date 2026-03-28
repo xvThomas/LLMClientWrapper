@@ -37,6 +37,12 @@ func NewConversationManager(client LlmClient, modelID string, provider Provider,
 	}
 }
 
+// sessionID returns the session ID from the store.
+func (m *ConversationManager) sessionID() string { return m.store.SessionID() }
+
+// userID returns the user ID from the store.
+func (m *ConversationManager) userID() string { return m.store.UserID() }
+
 // reportAPICall calls OnAPICall on all reporters in parallel.
 func (m *ConversationManager) reportAPICall(event APICallEvent) {
 	if len(m.reporters) == 0 {
@@ -95,10 +101,10 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 		return "", fmt.Errorf("loading system prompt: %w", err)
 	}
 
-	m.store.Add(Message{Role: RoleUser, Content: userInput})
+	turnTraceID := GenerateTraceID()
+	m.store.Add(Message{Role: RoleUser, Content: userInput, TurnID: turnTraceID})
 
 	turnStartedAt := time.Now()
-	turnTraceID := GenerateTraceID()
 	turnSpanID := GenerateSpanID()
 	var totalUsage Usage
 	var allToolCalls []ToolCall // Collect all tool calls for the turn event
@@ -131,6 +137,8 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 			Input:        conversationInput,
 			Output:       formatAPICallOutput(response.Content, response.ToolCalls),
 			ToolCalls:    response.ToolCalls,
+			SessionID:    m.sessionID(),
+			UserID:       m.userID(),
 		})
 
 		totalUsage = totalUsage.Add(usage)
@@ -152,6 +160,8 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 				Input:      userInput,
 				Output:     response.Content,
 				ToolCalls:  allToolCalls,
+				SessionID:  m.sessionID(),
+				UserID:     m.userID(),
 			})
 			return response.Content, nil
 		}

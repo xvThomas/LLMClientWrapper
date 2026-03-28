@@ -40,9 +40,11 @@ type stubStore struct {
 	messages []Message
 }
 
-func (s *stubStore) Add(msg Message) { s.messages = append(s.messages, msg) }
-func (s *stubStore) All() []Message  { return s.messages }
-func (s *stubStore) Clear()          { s.messages = nil }
+func (s *stubStore) Add(msg Message)   { s.messages = append(s.messages, msg) }
+func (s *stubStore) All() []Message    { return s.messages }
+func (s *stubStore) Clear()            { s.messages = nil }
+func (s *stubStore) SessionID() string { return "test-session" }
+func (s *stubStore) UserID() string    { return "anonymous" }
 
 // stubPromptProvider returns a fixed system prompt.
 type stubPromptProvider struct{ text string }

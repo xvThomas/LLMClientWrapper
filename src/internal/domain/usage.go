@@ -3,6 +3,7 @@ package domain
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"time"
 )
 
@@ -18,6 +19,15 @@ func GenerateSpanID() string {
 	b := make([]byte, 8)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// GenerateSessionID generates a random UUID v4 as a formatted string.
+func GenerateSessionID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant RFC 4122
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
 // Usage holds token consumption for a single LLM API call.
@@ -61,6 +71,8 @@ type APICallEvent struct {
 	Input        string     // The input prompt for this API call
 	Output       string     // The response content from the model
 	ToolCalls    []ToolCall // Tool calls made in this API call (if any)
+	SessionID    string     // Session identifier shared across the CLI session
+	UserID       string     // User identifier ("anonymous" until auth is added)
 }
 
 // TurnEvent is emitted once at the end of a full Chat() turn (all calls aggregated).
@@ -75,6 +87,8 @@ type TurnEvent struct {
 	Input      string     // The original user question
 	Output     string     // The final assistant response
 	ToolCalls  []ToolCall // All tool calls made during this turn
+	SessionID  string     // Session identifier shared across the CLI session
+	UserID     string     // User identifier ("anonymous" until auth is added)
 }
 
 // UsageReporter receives usage telemetry events.

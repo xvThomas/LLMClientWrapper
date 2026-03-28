@@ -28,4 +28,5 @@ type Message struct {
 	Content     string
 	ToolCalls   []ToolCall
 	ToolResults []ToolResult
+	TurnID      string // unique turn identifier used for reconciliation across sources
 }

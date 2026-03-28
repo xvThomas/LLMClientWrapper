@@ -14,7 +14,8 @@ import (
 	"llmclientwrapper/src/internal/domain"
 	"llmclientwrapper/src/internal/infrastructure/config"
 	"llmclientwrapper/src/internal/infrastructure/llm/router"
-	"llmclientwrapper/src/internal/infrastructure/memory"
+	inmemorystore "llmclientwrapper/src/internal/infrastructure/memory/inmemory"
+	langfusestore "llmclientwrapper/src/internal/infrastructure/memory/langfuse"
 	"llmclientwrapper/src/internal/infrastructure/prompt"
 	infratools "llmclientwrapper/src/internal/infrastructure/tools"
 	"llmclientwrapper/src/internal/infrastructure/usage"
@@ -74,7 +75,7 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 		return err
 	}
 
-	r := router.New(cfg)
+	r := router.NewLLMRouter(cfg)
 	client, err := r.Get(domain.Model(modelAlias))
 	if err != nil {
 		return err
@@ -88,7 +89,19 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 	pp := buildPromptProvider(systemFile)
 	tools := infratools.New(cfg).All()
 
-	store := memory.NewStore()
+	sessionID := domain.GenerateSessionID()
+	const userID = "anonymous"
+
+	var store domain.MessageStore
+	if cfg.LangfuseSecretKey != "" && cfg.LangfusePublicKey != "" {
+		store = langfusestore.NewLangfuseStore(sessionID, userID, langfusestore.Config{
+			PublicKey: cfg.LangfusePublicKey,
+			SecretKey: cfg.LangfuseSecretKey,
+			BaseURL:   cfg.LangfuseBaseURL,
+		})
+	} else {
+		store = inmemorystore.NewInMemoryStore(sessionID, userID)
+	}
 
 	// Create usage reporters based on configuration
 	var reporters []domain.UsageReporter
@@ -121,10 +134,12 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 	fmt.Print(cyan(bold+"Session started."+reset) + `
 ` +
 		faint(" Commands:\n") +
-		faint("  /model  — switch models\n") +
-		faint("  /prompt — show system prompt\n") +
-		faint("  /tools  — list available tools\n") +
-		faint("  /q      — quit\n"))
+		faint("  /model   — switch models\n") +
+		faint("  /memory  — show current session history\n") +
+		faint("  /session — switch conversation session\n") +
+		faint("  /prompt  — show system prompt\n") +
+		faint("  /tools   — list available tools\n") +
+		faint("  /q       — quit\n"))
 	history := NewHistory(historyFilePath())
 	lr := NewLineReader(history)
 	for {
@@ -143,7 +158,7 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 		}
 
 		if strings.HasPrefix(input, "/") {
-			handleSlashCommand(ctx, input, r, pp, manager, &currentModel, lr, tools)
+			handleSlashCommand(ctx, input, r, pp, store, manager, &currentModel, lr, tools)
 			continue
 		}
 		history.Add(input)
@@ -180,11 +195,15 @@ func historyFilePath() string {
 	return ".llmclientwrapper_history"
 }
 
-func handleSlashCommand(ctx context.Context, input string, r *router.Router, pp domain.PromptProvider, manager *domain.ConversationManager, currentModel *string, lr *LineReader, tools []domain.Tool) {
+func handleSlashCommand(ctx context.Context, input string, r *router.Router, pp domain.PromptProvider, store domain.MessageStore, manager *domain.ConversationManager, currentModel *string, lr *LineReader, tools []domain.Tool) {
 	cmd := strings.Fields(input)[0]
 	switch cmd {
 	case "/model":
 		cmdModel(r, manager, currentModel, lr)
+	case "/memory":
+		cmdMemory(ctx, store)
+	case "/session":
+		cmdSession(ctx, store, lr)
 	case "/prompt":
 		cmdPrompt(ctx, pp)
 	case "/tools":
@@ -192,8 +211,8 @@ func handleSlashCommand(ctx context.Context, input string, r *router.Router, pp 
 	case "/q":
 		cmdQuit()
 	default:
-		fmt.Printf("Unknown command %s. Available commands: %s, %s, %s, %s\n",
-			red(cmd), yellow("/model"), yellow("/prompt"), yellow("/tools"), yellow("/q"))
+		fmt.Printf("Unknown command %s. Available: %s, %s, %s, %s, %s, %s\n",
+			red(cmd), yellow("/model"), yellow("/memory"), yellow("/session"), yellow("/prompt"), yellow("/tools"), yellow("/q"))
 	}
 }
 
@@ -259,4 +278,86 @@ func cmdModel(r *router.Router, manager *domain.ConversationManager, currentMode
 	manager.SetClient(client, string(selected))
 	*currentModel = string(selected)
 	fmt.Printf("Switched to %s.\n", green(string(selected)))
+}
+
+func cmdMemory(ctx context.Context, store domain.MessageStore) {
+	sb, ok := store.(domain.SessionBrowser)
+	if !ok {
+		fmt.Println(faint("(session history not available)"))
+		return
+	}
+	turns, err := sb.LoadSession(ctx, store.SessionID())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, red("Error: ")+err.Error())
+		return
+	}
+	if len(turns) == 0 {
+		fmt.Println(faint("(no history for current session)"))
+		return
+	}
+	fmt.Printf("\n%s  %s\n", emphasize("Session history:"), faint(store.SessionID()))
+	for i, t := range turns {
+		turnIDStr := ""
+		if t.TurnID != "" {
+			turnIDStr = "  " + faint(t.TurnID)
+		}
+		fmt.Printf("\n%s  %s%s\n",
+			emphasize(fmt.Sprintf("Turn %d", i+1)),
+			faint(t.At.Format("2006-01-02 15:04:05")),
+			turnIDStr)
+		fmt.Printf("  %s %s\n", green(bold+"You"+reset+":"), t.Question)
+		fmt.Printf("  %s %s\n", cyan(bold+"Assistant"+reset+":"), t.Answer)
+		if t.CallCount > 1 {
+			fmt.Printf("  %s\n", faint(fmt.Sprintf("(%d LLM calls)", t.CallCount)))
+		}
+	}
+}
+
+func cmdSession(ctx context.Context, store domain.MessageStore, lr *LineReader) {
+	sb, ok := store.(domain.SessionBrowser)
+	if !ok {
+		fmt.Println(faint("(session switching not available)"))
+		return
+	}
+	sessions, err := sb.ListSessions(ctx, store.UserID())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, red("Error: ")+err.Error())
+		return
+	}
+	fmt.Printf("\n%s  %s\n", emphasize("Sessions:"), faint("user: "+store.UserID()))
+	if len(sessions) == 0 {
+		fmt.Println(faint("  (no past sessions found)"))
+		return
+	}
+	for i, s := range sessions {
+		label := shortID(s.ID)
+		marker := ""
+		if s.ID == store.SessionID() {
+			marker = " " + green("← current")
+		}
+		fmt.Printf("  [%d] %s  %s%s\n", i+1, cyan(label), faint(s.CreatedAt.Format("2006-01-02 15:04")), marker)
+	}
+	choice, err := lr.ReadLine(fmt.Sprintf("Choose [1-%d] (Enter to cancel): ", len(sessions)))
+	if err != nil || strings.TrimSpace(choice) == "" {
+		return
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(choice))
+	if err != nil || n < 1 || n > len(sessions) {
+		fmt.Println(yellow("Invalid choice."))
+		return
+	}
+	selected := sessions[n-1].ID
+	if err := sb.SetSession(ctx, selected); err != nil {
+		fmt.Fprintln(os.Stderr, red("Error switching session: ")+err.Error())
+		return
+	}
+	fmt.Printf("Switched to session %s.\n", green(shortID(selected)))
+}
+
+// shortID returns a concise display form of a session UUID.
+func shortID(id string) string {
+	if len(id) > 8 {
+		return id[:8] + "…"
+	}
+	return id
 }

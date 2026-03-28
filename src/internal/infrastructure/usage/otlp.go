@@ -176,8 +176,12 @@ func (l *LangfuseUsageReporter) conversationTurnToOTLP(event domain.TurnEvent) (
 	spanID := event.SpanID
 
 	attributes := []OTLPAttribute{
-		// Trace-level attributes
+		// Trace-level attributes (Langfuse OTLP mapping)
 		{Key: "langfuse.trace.name", Value: stringValue("conversation_turn")},
+		{Key: "langfuse.session.id", Value: stringValue(event.SessionID)},
+		{Key: "langfuse.user.id", Value: stringValue(event.UserID)},
+		{Key: "langfuse.trace.input", Value: stringValue(event.Input)},
+		{Key: "langfuse.trace.output", Value: stringValue(event.Output)},
 
 		// Model information
 		{Key: "gen_ai.request.model", Value: stringValue(event.Model)},
@@ -187,7 +191,7 @@ func (l *LangfuseUsageReporter) conversationTurnToOTLP(event domain.TurnEvent) (
 		{Key: "gen_ai.prompt", Value: stringValue(event.Input)},
 		{Key: "gen_ai.completion", Value: stringValue(event.Output)},
 
-		// Langfuse-specific input/output
+		// Langfuse observation-level input/output
 		{Key: "langfuse.observation.input", Value: stringValue(event.Input)},
 		{Key: "langfuse.observation.output", Value: stringValue(event.Output)},
 
