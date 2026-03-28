@@ -13,13 +13,13 @@ import (
 
 	"llmclientwrapper/src/internal/domain"
 	"llmclientwrapper/src/internal/infrastructure/config"
-	"llmclientwrapper/src/internal/version"
 	"llmclientwrapper/src/internal/infrastructure/llm/router"
 	inmemorystore "llmclientwrapper/src/internal/infrastructure/memory/inmemory"
 	langfusestore "llmclientwrapper/src/internal/infrastructure/memory/langfuse"
 	"llmclientwrapper/src/internal/infrastructure/prompt"
 	infratools "llmclientwrapper/src/internal/infrastructure/tools"
 	"llmclientwrapper/src/internal/infrastructure/usage"
+	"llmclientwrapper/src/internal/version"
 
 	"github.com/spf13/cobra"
 )
