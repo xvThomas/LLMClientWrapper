@@ -12,6 +12,8 @@ import (
 // Can be combined with other reporters like LangfuseUsageReporter for dual logging.
 type ConsoleUsageReporter struct{}
 
+var _ domain.UsageReporter = (*ConsoleUsageReporter)(nil) // compile-time interface check
+
 // OnAPICall is called after every API call and prints the token usage for that call.
 //
 // Parameters:

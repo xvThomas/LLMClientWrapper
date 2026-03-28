@@ -13,6 +13,7 @@ import (
 
 	"llmclientwrapper/src/internal/domain"
 	"llmclientwrapper/src/internal/infrastructure/config"
+	"llmclientwrapper/src/internal/version"
 	"llmclientwrapper/src/internal/infrastructure/llm/router"
 	inmemorystore "llmclientwrapper/src/internal/infrastructure/memory/inmemory"
 	langfusestore "llmclientwrapper/src/internal/infrastructure/memory/langfuse"
@@ -131,7 +132,7 @@ func run(ctx context.Context, modelAlias, systemFile string) error {
 	manager := domain.NewConversationManager(client, modelAlias, modelDescriptor.Provider, store, pp, tools, reporters, cfg.ToolsMaxConcurrent)
 	currentModel := modelAlias
 
-	fmt.Print(cyan(bold+"Session started."+reset) + `
+	fmt.Print(cyan(bold+"Session started."+reset) + faint(" "+version.Version) + `
 ` +
 		faint(" Commands:\n") +
 		faint("  /model   — switch models\n") +

@@ -39,6 +39,8 @@ type LangfuseConfig struct {
 	BaseURL   string
 }
 
+var _ domain.UsageReporter = (*LangfuseUsageReporter)(nil) // compile-time interface check
+
 // NewLangfuseUsageReporter creates a new Langfuse usage reporter.
 // It starts a background worker to process events asynchronously.
 func NewLangfuseUsageReporter(config LangfuseConfig) *LangfuseUsageReporter {
