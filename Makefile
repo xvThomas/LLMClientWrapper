@@ -13,7 +13,7 @@ build:
 	go build $(LDFLAGS) -o $(BINARY) $(CMD)
 
 run:
-	go run $(CMD) --model $(MODEL) --system-file $(SYSTEM_FILE)
+	go run $(LDFLAGS) $(CMD) --model $(MODEL) --system-file $(SYSTEM_FILE)
 
 test:
 	go test ./...
