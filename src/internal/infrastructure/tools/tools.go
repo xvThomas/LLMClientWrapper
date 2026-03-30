@@ -3,7 +3,7 @@ package tools
 import (
 	"llmclientwrapper/src/internal/domain"
 	"llmclientwrapper/src/internal/infrastructure/config"
-	"llmclientwrapper/src/internal/infrastructure/tools/weather"
+	"llmclientwrapper/src/internal/infrastructure/tools/openweathermaps/weather"
 )
 
 // Tools aggregates all available domain.Tool implementations.
@@ -18,7 +18,7 @@ func New(cfg *config.Config) *Tools {
 
 // All returns the list of all registered tools as type-erased Tool handlers.
 func (t *Tools) All() []domain.Tool {
-	w := weather.NewOpenWeatherMapTool(t.cfg.OpenWeatherMapAPIKey)
+	w := weather.NewCurrentWeatherTool(t.cfg.OpenWeatherMapAPIKey)
 	return []domain.Tool{
 		domain.Adapt(w, w.Parameters),
 	}
