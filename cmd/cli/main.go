@@ -11,15 +11,15 @@ import (
 	"strconv"
 	"strings"
 
-	"llmclientwrapper/src/internal/domain"
-	"llmclientwrapper/src/internal/infrastructure/config"
-	"llmclientwrapper/src/internal/infrastructure/llm/router"
-	inmemorystore "llmclientwrapper/src/internal/infrastructure/memory/inmemory"
-	langfusestore "llmclientwrapper/src/internal/infrastructure/memory/langfuse"
-	"llmclientwrapper/src/internal/infrastructure/prompt"
-	infratools "llmclientwrapper/src/internal/infrastructure/tools"
-	"llmclientwrapper/src/internal/infrastructure/usage"
-	"llmclientwrapper/src/internal/version"
+	"talks/internal/domain"
+	"talks/internal/infrastructure/config"
+	"talks/internal/infrastructure/llm/router"
+	inmemorystore "talks/internal/infrastructure/memory/inmemory"
+	langfusestore "talks/internal/infrastructure/memory/langfuse"
+	"talks/internal/infrastructure/prompt"
+	infratools "talks/internal/infrastructure/tools"
+	"talks/internal/infrastructure/usage"
+	"talks/internal/version"
 
 	"github.com/spf13/cobra"
 )
@@ -55,7 +55,7 @@ func newRootCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "llmclientwrapper",
+		Use:   "talk-cli",
 		Short: "Interactive LLM conversation session",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), modelFlag, systemFileFlag)
@@ -191,9 +191,9 @@ func defaultSystemPromptPath() string {
 
 func historyFilePath() string {
 	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, ".llmclientwrapper_history")
+		return filepath.Join(home, ".talks_history")
 	}
-	return ".llmclientwrapper_history"
+	return ".talks_history"
 }
 
 func handleSlashCommand(ctx context.Context, input string, r *router.Router, pp domain.PromptProvider, store domain.MessageStore, manager *domain.ConversationManager, currentModel *string, lr *LineReader, tools []domain.Tool) {

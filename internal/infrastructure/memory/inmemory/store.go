@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"llmclientwrapper/src/internal/domain"
+	"talks/internal/domain"
 )
 
 // InMemoryStore is a thread-safe in-memory implementation of domain.MessageStore and domain.SessionBrowser.

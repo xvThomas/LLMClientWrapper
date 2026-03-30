@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"llmclientwrapper/src/internal/domain"
+	"talks/internal/domain"
 	"net/http"
 	"net/url"
 	"time"

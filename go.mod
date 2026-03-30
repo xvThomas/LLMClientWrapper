@@ -1,4 +1,4 @@
-module llmclientwrapper
+module talks
 
 go 1.25.0
 

@@ -1,9 +1,9 @@
 package tools
 
 import (
-	"llmclientwrapper/src/internal/domain"
-	"llmclientwrapper/src/internal/infrastructure/config"
-	"llmclientwrapper/src/internal/infrastructure/tools/openweathermaps/weather"
+	"talks/internal/domain"
+	"talks/internal/infrastructure/config"
+	"talks/internal/infrastructure/tools/openweathermaps/weather"
 )
 
 // Tools aggregates all available domain.Tool implementations.

@@ -3,7 +3,7 @@ package usage
 import (
 	"fmt"
 
-	"llmclientwrapper/src/internal/domain"
+	"talks/internal/domain"
 )
 
 // ConsoleUsageReporter implements domain.UsageReporter by printing token usage

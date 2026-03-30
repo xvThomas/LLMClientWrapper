@@ -2,7 +2,7 @@ package openai
 
 import (
 	"encoding/json"
-	"llmclientwrapper/src/internal/domain"
+	"talks/internal/domain"
 
 	"github.com/openai/openai-go"
 )

@@ -1,4 +1,4 @@
-# LLM Client Wrapper
+# talks
 
 A Go CLI that routes questions to Anthropic or OpenAI-compatible models (GPT, Mistral, Devstral …) through a single unified interface. Supports tool calls (OpenWeatherMap example), Anthropic prompt caching, and in-memory conversation history.
 
@@ -33,13 +33,13 @@ make run MODEL=sonnet-4.6
 Or without `make`:
 
 ```bash
-go run ./src/cmd --model sonnet-4.6
+go run ./cmd/cli --model sonnet-4.6
 ```
 
 Use a custom system prompt file:
 
 ```bash
-go run ./src/cmd --model mistral-small --system-file ./my_prompt.md
+go run ./cmd/cli --model mistral-small --system-file ./my_prompt.md
 ```
 
 Type `exit` or `quit` (or press `Ctrl+C`) to end the session.
@@ -87,7 +87,7 @@ Override at runtime with `--system-file`:
 
 | Target               | Description                                                     |
 | -------------------- | --------------------------------------------------------------- |
-| `make build`         | Compile to `bin/llmclientwrapper`                               |
+| `make build`         | Compile to `bin/talk-cli`                                       |
 | `make run`           | Interactive session — override with `MODEL=` and `SYSTEM_FILE=` |
 | `make test`          | Run all unit tests                                              |
 | `make cover`         | Generate `coverage.html` (opens-ready HTML report)              |
@@ -101,19 +101,20 @@ Override at runtime with `--system-file`:
 
 ```txt
 .
-├── src/
-│   ├── cmd/                        # CLI entry point (interactive REPL)
-│   └── internal/
-│       ├── domain/                 # Interfaces & types (Model, Message, Tool …)
-│       └── infrastructure/
-│           ├── llm/                # LLM provider implementations
-│           │   ├── anthropic/
-│           │   ├── openai/
-│           │   └── router/         # Builds LlmClient from config + model alias
-│           ├── config/             # .env loader
-│           ├── memory/             # In-memory conversation store
-│           ├── prompt/             # File & static prompt providers
-│           └── weather/            # OpenWeatherMap tool
+├── cmd/
+│   └── cli/                        # CLI entry point (interactive REPL)
+├── internal/
+│   ├── domain/                     # Interfaces & types (Model, Message, Tool …)
+│   └── infrastructure/
+│       ├── llm/                    # LLM provider implementations
+│       │   ├── anthropic/
+│       │   ├── openai/
+│       │   └── router/             # Builds LlmClient from config + model alias
+│       ├── config/                 # .env loader
+│       ├── memory/                 # In-memory & Langfuse conversation stores
+│       ├── prompt/                 # File & static prompt providers
+│       ├── tools/                  # Tool aggregator + OpenWeatherMap tool
+│       └── usage/                  # Console & Langfuse usage reporters
 ├── system_prompt.md                # Default system prompt
 ├── .env.example
 └── Makefile

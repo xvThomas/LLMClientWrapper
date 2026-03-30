@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"llmclientwrapper/src/internal/domain"
-	"llmclientwrapper/src/internal/version"
+	"talks/internal/domain"
+	"talks/internal/version"
 )
 
 // LangfuseUsageReporter implements domain.UsageReporter by sending traces to Langfuse
@@ -153,14 +153,14 @@ func (l *LangfuseUsageReporter) sendTrace(trace *OTLPTrace) error {
 			{
 				Resource: OTLPResource{
 					Attributes: []OTLPAttribute{
-						{Key: "service.name", Value: stringValue("llmclientwrapper")},
+						{Key: "service.name", Value: stringValue("talks")},
 						{Key: "service.version", Value: stringValue(version.Version)},
 					},
 				},
 				ScopeSpans: []OTLPScopeSpans{
 					{
 						Scope: OTLPInstrumentationScope{
-							Name:    "llmclientwrapper",
+							Name:    "talks",
 							Version: version.Version,
 						},
 						Spans: []OTLPSpan{trace.Span},

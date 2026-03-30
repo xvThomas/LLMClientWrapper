@@ -1,5 +1,5 @@
 ---
-applyTo: src/cmd/**
+applyTo: cmd/cli/**
 ---
 
 # CLI colour conventions

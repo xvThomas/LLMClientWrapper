@@ -3,7 +3,7 @@ package anthropic
 import (
 	"context"
 	"fmt"
-	"llmclientwrapper/src/internal/domain"
+	"talks/internal/domain"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"

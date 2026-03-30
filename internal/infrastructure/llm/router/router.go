@@ -3,10 +3,10 @@ package router
 import (
 	"fmt"
 
-	"llmclientwrapper/src/internal/domain"
-	"llmclientwrapper/src/internal/infrastructure/config"
-	"llmclientwrapper/src/internal/infrastructure/llm/anthropic"
-	"llmclientwrapper/src/internal/infrastructure/llm/openai"
+	"talks/internal/domain"
+	"talks/internal/infrastructure/config"
+	"talks/internal/infrastructure/llm/anthropic"
+	"talks/internal/infrastructure/llm/openai"
 )
 
 // Router builds LlmClient instances for model aliases from configuration.

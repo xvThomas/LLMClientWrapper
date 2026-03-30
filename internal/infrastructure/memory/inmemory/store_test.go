@@ -1,7 +1,7 @@
 package inmemory
 
 import (
-	"llmclientwrapper/src/internal/domain"
+	"talks/internal/domain"
 	"testing"
 )
 

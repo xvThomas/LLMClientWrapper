@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"llmclientwrapper/src/internal/domain"
+	"talks/internal/domain"
 )
 
 // Config holds connection settings for the Langfuse API.

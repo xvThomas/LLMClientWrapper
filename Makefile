@@ -1,9 +1,9 @@
-BINARY   := bin/llmclientwrapper
-CMD      := ./src/cmd
+BINARY   := bin/talk-cli
+CMD      := ./cmd/cli
 MODEL    ?= haiku-4.5
 SYSTEM_FILE := ./system_prompt.md
 VERSION  := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS  := -ldflags "-X llmclientwrapper/src/internal/version.Version=$(VERSION)"
+LDFLAGS  := -ldflags "-X talks/internal/version.Version=$(VERSION)"
 
 .PHONY: all build run test cover cover-summary vet clean
 

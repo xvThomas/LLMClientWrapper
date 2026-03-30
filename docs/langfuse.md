@@ -1,31 +1,47 @@
-# Integration Langfuse
+# Langfuse Integration
 
-Il s'agit d'intégrer LangFuse via le mécanisme de UsageReporter pour envoyer les données vers langFuse (par une implémentation LangfuseUsageReporter.go)
+Langfuse is integrated via the `domain.UsageReporter` interface. There is no official Go SDK for Langfuse; the implementation sends traces directly over HTTP using the OpenTelemetry OTLP format.
 
-- Verifier qu'il existe une librairie langfuse pour go (sinon créeer une implémentataion à partir d'un client http)
-- envoyer un maximum d'information dans un premier via l'API langfuse:
-    Question/Prompt : "temps à Orléans ?"
-    Réponse du modèle : "À Orléans, il fait 5,5°C..."
-    Tool calls : {name: "get_current_weather", params: {city: "Orléans"}}
-    Tool input/output : Input: {city: "Orléans"}, Output: "5.5°C, sunny"
-    Token usage : {prompt: 637, completion: 58, cache_read: 0, cache_write: 0}
-    Latency : 850ms pour le call API
-    Model & provider : claude-sonnet-4-5 (Anthropic)
+## Architecture
 
-    Métadonnées custom : {user_id, session_id, tags, custom_fields}, pour l'instant elles seront vides (nous les renseigneront utltérieurement)
+```
+domain.UsageReporter          (interface, in internal/domain/usage.go)
+  ├── ConsoleUsageReporter    (internal/infrastructure/usage/console.go)
+  └── LangfuseUsageReporter   (internal/infrastructure/usage/langfuse.go)
+```
 
-Cost : Calculé automatiquement à partir des tokens (est ce que cela se fait dans langfuse, ou faut il faire quelque chose au niveau de la code base ?)
+Reporters are **additive**: the `ConversationManager` holds a slice of `UsageReporter` and fires all of them in parallel via `sync.WaitGroup` after each API call and conversation turn.
 
-- Ajouter au variables d'environnement, les vraiables supplémentaires
-  - LANGFUSE_SECRET_KEY="sk-lf-..."
-  - LANGFUSE_PUBLIC_KEY="pk-lf-..."
-  - LANGFUSE_BASE_URL="https://cloud.langfuse.com" (valeur par défaut si nons stipulé)
+## Data sent to Langfuse
 
-- les usageReporter sont cumulatifs, c'est à dire
- - si la (nouvelle) variable d'env CONSOLE_USAGE_REPORTER est spécifiée (égale à 1 ou true, voir avec la bonne pratique pour cela), alors ConsoleUsageReporter est utilisé
- - d'autre part si les variables LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY ne sont toutes deux présentes alors LangfuseUsageReporter est également utilisé
- - il s'agit donc de gerer maintenant un tableau d'UsageReporter (éventuellement vide) et de les utilser en parrallèle si il contient plusieurs occurences.
+Each recorded event is converted to an OTLP span and posted to the `/v1/traces` endpoint:
 
- Enfin ConsoleUsageReporter.go devrait maintant être rangé dans /internal/infrastructure/usage à coté de LangfuseUsageReporter.go (UsageReporter est bien placé, dans le réprtoire domain)
- 
- La mise à jour succinte du README.md et de plan_llmClientWrapper.prompt.md sont à faire également
+| Field             | Example                                                        |
+| ----------------- | -------------------------------------------------------------- |
+| Prompt / question | `"What is the temperature in Orléans?"`                        |
+| Model response    | `"In Orléans, it is 5.5°C..."`                                 |
+| Tool calls        | `{name: "get_current_weather", params: {city: "Orléans"}}`     |
+| Tool input/output | Input: `{city: "Orléans"}`, Output: `"5.5°C, sunny"`           |
+| Token usage       | `{prompt: 637, completion: 58, cache_read: 0, cache_write: 0}` |
+| Latency           | `850ms` per API call                                           |
+| Model & provider  | `claude-sonnet-4-5 (Anthropic)`                                |
+| Service name      | `talks`                                                        |
+
+Cost is calculated automatically by Langfuse from the token counts and model name — no additional handling is needed in the codebase.
+
+Custom metadata fields (`user_id`, `session_id`, `tags`) are present in the OTLP span structure but left empty for now.
+
+## Transport
+
+`LangfuseUsageReporter` buffers events in a channel (capacity 1000) and processes them in a background goroutine. Authentication uses HTTP Basic Auth: `base64(LANGFUSE_PUBLIC_KEY:LANGFUSE_SECRET_KEY)`.
+
+## Environment variables
+
+| Variable                 | Required        | Default                      | Description                                           |
+| ------------------------ | --------------- | ---------------------------- | ----------------------------------------------------- |
+| `LANGFUSE_PUBLIC_KEY`    | yes (to enable) | —                            | `pk-lf-…`                                             |
+| `LANGFUSE_SECRET_KEY`    | yes (to enable) | —                            | `sk-lf-…`                                             |
+| `LANGFUSE_BASE_URL`      | no              | `https://cloud.langfuse.com` | Use `https://us.cloud.langfuse.com` for the US region |
+| `CONSOLE_USAGE_REPORTER` | no              | `true`                       | Set to `false` to disable terminal token output       |
+
+`LangfuseUsageReporter` is only instantiated when both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are present. The two reporters are independent and can be active simultaneously.

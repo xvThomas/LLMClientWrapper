@@ -1,5 +1,5 @@
 ---
-applyTo: src/internal/infrastructure/config/loader.go, .env.example
+applyTo: internal/infrastructure/config/loader.go, .env.example
 ---
 
 # Environment Variables Documentation Update

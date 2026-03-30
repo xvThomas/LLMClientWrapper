@@ -3,7 +3,7 @@ package router
 import (
 	"testing"
 
-	"llmclientwrapper/src/internal/infrastructure/config"
+	"talks/internal/infrastructure/config"
 )
 
 func TestRouter_UnknownModelReturnsError(t *testing.T) {
