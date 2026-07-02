@@ -12,9 +12,10 @@ import (
 
 // mcpToolAdapter adapts an MCP remote tool into the domain.Tool interface.
 type mcpToolAdapter struct {
+	manager    *Manager
+	serverID   string
 	serverName string
 	tool       mcp.Tool
-	session    *mcp.ClientSession
 }
 
 func (a *mcpToolAdapter) Name() string {
@@ -58,12 +59,32 @@ func (a *mcpToolAdapter) OutputSchema() (map[string]any, error) {
 }
 
 func (a *mcpToolAdapter) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
-	result, err := a.session.CallTool(ctx, &mcp.CallToolParams{
+	session, err := a.manager.EnsureConnected(ctx, a.serverID)
+	if err != nil {
+		return nil, fmt.Errorf("MCP tool execution is unavailable for server %q: %w", a.serverName, err)
+	}
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      a.tool.Name,
 		Arguments: input,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("calling tool %q on server %q: %w", a.tool.Name, a.serverName, err)
+		if !isReconnectableCallError(err) {
+			return nil, fmt.Errorf("calling tool %q on server %q: %w", a.tool.Name, a.serverName, err)
+		}
+
+		session, reconnectErr := a.manager.Reconnect(ctx, a.serverID)
+		if reconnectErr != nil {
+			return nil, fmt.Errorf("MCP tool execution is unavailable for server %q: %w", a.serverName, reconnectErr)
+		}
+
+		result, err = session.CallTool(ctx, &mcp.CallToolParams{
+			Name:      a.tool.Name,
+			Arguments: input,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("calling tool %q on server %q after reconnect: %w", a.tool.Name, a.serverName, err)
+		}
 	}
 	if result.IsError {
 		return nil, fmt.Errorf("tool %q returned error: %s", a.tool.Name, extractTextContent(result.Content))

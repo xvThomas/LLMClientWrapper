@@ -2,8 +2,12 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -27,10 +31,15 @@ type ServerStatus struct {
 // Manager manages connections to registered MCP servers.
 type Manager struct {
 	registry Registry
+	mu       sync.RWMutex
+	dial     func(context.Context, ServerConfig) (*mcp.ClientSession, error)
 	sessions map[string]*mcp.ClientSession // keyed by ServerConfig.ID
 	statuses []ServerStatus
 	tools    []domain.Tool
 }
+
+// ErrSessionUnavailable indicates the MCP session could not be restored.
+var ErrSessionUnavailable = errors.New("mcp session unavailable")
 
 // NewManager creates a new Manager using the given Registry.
 func NewManager(registry Registry) *Manager {
@@ -45,57 +54,96 @@ func NewManager(registry Registry) *Manager {
 func (m *Manager) ConnectAll(ctx context.Context) {
 	configs, err := m.registry.List(ctx)
 	if err != nil {
+		m.mu.Lock()
 		m.statuses = []ServerStatus{{Error: fmt.Sprintf("failed to list servers: %v", err)}}
+		m.mu.Unlock()
 		return
 	}
 
+	m.mu.Lock()
 	m.tools = []domain.Tool{}
 	m.statuses = []ServerStatus{}
+	m.sessions = make(map[string]*mcp.ClientSession)
+	m.mu.Unlock()
 
 	for _, cfg := range configs {
-		status := ServerStatus{Config: cfg}
-		session, err := m.connect(ctx, cfg)
-		if err != nil {
-			status.Error = err.Error()
-			m.statuses = append(m.statuses, status)
-			continue
-		}
-		m.sessions[cfg.ID] = session
-		status.Connected = true
-
-		// Retrieve server info from the initialization result.
-		if res := session.InitializeResult(); res != nil && res.ServerInfo != nil {
-			status.ServerName = res.ServerInfo.Name
-			status.ServerVersion = res.ServerInfo.Version
-		}
-
-		// List available tools.
-		toolsResult, err := session.ListTools(ctx, &mcp.ListToolsParams{})
-		if err != nil {
-			status.Error = fmt.Sprintf("connected but failed to list tools: %v", err)
-			m.statuses = append(m.statuses, status)
-			continue
-		}
-
-		for _, t := range toolsResult.Tools {
-			status.Tools = append(status.Tools, t.Name)
-			m.tools = append(m.tools, &mcpToolAdapter{
-				serverName: cfg.Name,
-				tool:       *t,
-				session:    session,
-			})
-		}
-		m.statuses = append(m.statuses, status)
+		status, session, tools := m.connectServer(ctx, cfg)
+		m.storeConnectionState(cfg, status, session, tools)
 	}
 }
 
 // Connect connects to a single MCP server by config. Used for testing a new server on add.
 func (m *Manager) Connect(ctx context.Context, cfg ServerConfig) (*ServerStatus, error) {
+	status, session, tools := m.connectServer(ctx, cfg)
+	if status.Error != "" {
+		return &status, fmt.Errorf("%s", status.Error)
+	}
+
+	m.storeConnectionState(cfg, status, session, tools)
+	return &status, nil
+}
+
+// EnsureConnected returns an active session for the given server, reconnecting it if needed.
+func (m *Manager) EnsureConnected(ctx context.Context, id string) (*mcp.ClientSession, error) {
+	cfg, err := m.registry.Get(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("%w: loading config for server %q: %v", ErrSessionUnavailable, id, err)
+	}
+
+	m.mu.RLock()
+	session := m.sessions[id]
+	m.mu.RUnlock()
+	if session != nil {
+		return session, nil
+	}
+
+	return m.reconnect(ctx, cfg)
+}
+
+// Reconnect recreates the MCP session for the given server ID.
+func (m *Manager) Reconnect(ctx context.Context, id string) (*mcp.ClientSession, error) {
+	cfg, err := m.registry.Get(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("%w: loading config for server %q: %v", ErrSessionUnavailable, id, err)
+	}
+
+	return m.reconnect(ctx, cfg)
+}
+
+func (m *Manager) reconnect(ctx context.Context, cfg ServerConfig) (*mcp.ClientSession, error) {
+	slog.Info("attempting MCP reconnect",
+		slog.String("server_id", cfg.ID),
+		slog.String("server_name", cfg.Name),
+		slog.String("server_url", cfg.URL),
+	)
+
+	status, session, tools := m.connectServer(ctx, cfg)
+	if status.Error != "" {
+		slog.Error("MCP reconnect failed",
+			slog.String("server_id", cfg.ID),
+			slog.String("server_name", cfg.Name),
+			slog.String("server_url", cfg.URL),
+			slog.String("error", status.Error),
+		)
+		m.storeConnectionState(cfg, status, nil, nil)
+		return nil, fmt.Errorf("%w: %s", ErrSessionUnavailable, status.Error)
+	}
+
+	m.storeConnectionState(cfg, status, session, tools)
+	slog.Info("MCP reconnect succeeded",
+		slog.String("server_id", cfg.ID),
+		slog.String("server_name", cfg.Name),
+		slog.String("server_url", cfg.URL),
+	)
+	return session, nil
+}
+
+func (m *Manager) connectServer(ctx context.Context, cfg ServerConfig) (ServerStatus, *mcp.ClientSession, []domain.Tool) {
 	status := ServerStatus{Config: cfg}
 	session, err := m.connect(ctx, cfg)
 	if err != nil {
 		status.Error = err.Error()
-		return &status, err
+		return status, nil, nil
 	}
 
 	status.Connected = true
@@ -108,41 +156,51 @@ func (m *Manager) Connect(ctx context.Context, cfg ServerConfig) (*ServerStatus,
 	if err != nil {
 		status.Error = fmt.Sprintf("connected but failed to list tools: %v", err)
 		_ = session.Close()
-		return &status, nil
+		return status, nil, nil
 	}
 
+	tools := make([]domain.Tool, 0, len(toolsResult.Tools))
 	for _, t := range toolsResult.Tools {
 		status.Tools = append(status.Tools, t.Name)
-		m.tools = append(m.tools, &mcpToolAdapter{
+		tools = append(tools, &mcpToolAdapter{
+			manager:    m,
+			serverID:   cfg.ID,
 			serverName: cfg.Name,
 			tool:       *t,
-			session:    session,
 		})
 	}
 
-	m.sessions[cfg.ID] = session
-	m.statuses = append(m.statuses, status)
-	return &status, nil
+	return status, session, tools
 }
 
 // Disconnect closes and removes a specific server connection and its tools.
 func (m *Manager) Disconnect(id string) {
+	m.mu.Lock()
 	if session, ok := m.sessions[id]; ok {
 		_ = session.Close()
 		delete(m.sessions, id)
 	}
+	m.mu.Unlock()
 	m.rebuildToolsExcluding(id)
 }
 
 // Refresh re-queries the tool list for all connected servers and rebuilds the
 // internal tools slice. Returns the number of tools discovered.
 func (m *Manager) Refresh(ctx context.Context) int {
-	m.tools = []domain.Tool{}
-	for i := range m.statuses {
-		st := &m.statuses[i]
+	m.mu.Lock()
+	statuses := append([]ServerStatus(nil), m.statuses...)
+	sessions := make(map[string]*mcp.ClientSession, len(m.sessions))
+	for id, session := range m.sessions {
+		sessions[id] = session
+	}
+	m.mu.Unlock()
+
+	refreshedTools := []domain.Tool{}
+	for i := range statuses {
+		st := &statuses[i]
 		st.Tools = nil
 
-		session, ok := m.sessions[st.Config.ID]
+		session, ok := sessions[st.Config.ID]
 		if !ok || !st.Connected {
 			continue
 		}
@@ -156,22 +214,32 @@ func (m *Manager) Refresh(ctx context.Context) int {
 		st.Error = ""
 		for _, t := range toolsResult.Tools {
 			st.Tools = append(st.Tools, t.Name)
-			m.tools = append(m.tools, &mcpToolAdapter{
+			refreshedTools = append(refreshedTools, &mcpToolAdapter{
+				manager:    m,
+				serverID:   st.Config.ID,
 				serverName: st.Config.Name,
 				tool:       *t,
-				session:    session,
 			})
 		}
 	}
-	return len(m.tools)
+
+	m.mu.Lock()
+	m.tools = refreshedTools
+	m.statuses = statuses
+	count := len(m.tools)
+	m.mu.Unlock()
+	return count
 }
 
 func (m *Manager) rebuildToolsExcluding(excludeID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	var filtered []domain.Tool
 	for _, t := range m.tools {
 		if adapter, ok := t.(*mcpToolAdapter); ok {
 			for _, st := range m.statuses {
-				if st.Config.ID == excludeID && adapter.serverName == st.Config.Name {
+				if st.Config.ID == excludeID && adapter.serverID == st.Config.ID {
 					goto skip
 				}
 			}
@@ -192,23 +260,105 @@ func (m *Manager) rebuildToolsExcluding(excludeID string) {
 
 // Tools returns all tools from all connected MCP servers.
 func (m *Manager) Tools() []domain.Tool {
-	return m.tools
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	tools := make([]domain.Tool, len(m.tools))
+	copy(tools, m.tools)
+	return tools
 }
 
 // Statuses returns the connection status for all servers.
 func (m *Manager) Statuses() []ServerStatus {
-	return m.statuses
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	statuses := make([]ServerStatus, len(m.statuses))
+	copy(statuses, m.statuses)
+	return statuses
 }
 
 // Close closes all active MCP sessions.
 func (m *Manager) Close() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	for id, session := range m.sessions {
 		_ = session.Close()
 		delete(m.sessions, id)
 	}
 }
 
+func (m *Manager) storeConnectionState(cfg ServerConfig, status ServerStatus, session *mcp.ClientSession, tools []domain.Tool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if existing, ok := m.sessions[cfg.ID]; ok && existing != nil && existing != session {
+		_ = existing.Close()
+	}
+
+	if session == nil {
+		delete(m.sessions, cfg.ID)
+	} else {
+		m.sessions[cfg.ID] = session
+	}
+
+	statusIndex := -1
+	for i := range m.statuses {
+		if m.statuses[i].Config.ID == cfg.ID {
+			statusIndex = i
+			break
+		}
+	}
+	if statusIndex >= 0 {
+		m.statuses[statusIndex] = status
+	} else {
+		m.statuses = append(m.statuses, status)
+	}
+
+	filteredTools := m.tools[:0]
+	for _, tool := range m.tools {
+		adapter, ok := tool.(*mcpToolAdapter)
+		if ok && adapter.serverID == cfg.ID {
+			continue
+		}
+		filteredTools = append(filteredTools, tool)
+	}
+	m.tools = append(filteredTools, tools...)
+}
+
+func isReconnectableCallError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	reconnectableMarkers := []string{
+		"broken pipe",
+		"connection closed",
+		"connection reset",
+		"connection refused",
+		"client is closing",
+		"eof",
+		"closed network connection",
+		"use of closed network connection",
+		"stream closed",
+		"transport is closing",
+		"session closed",
+	}
+
+	for _, marker := range reconnectableMarkers {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (m *Manager) connect(ctx context.Context, cfg ServerConfig) (*mcp.ClientSession, error) {
+	if m.dial != nil {
+		return m.dial(ctx, cfg)
+	}
+
 	connectCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 

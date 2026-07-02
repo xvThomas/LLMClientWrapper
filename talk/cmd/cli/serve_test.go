@@ -12,6 +12,7 @@ import (
 	"github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/types"
 	"github.com/xvThomas/talk-backend/talk/internal/config"
 	"github.com/xvThomas/talk-backend/talk/internal/domain"
+	"github.com/xvThomas/talk-backend/talk/internal/mcp"
 	sqlitestore "github.com/xvThomas/talk-backend/talk/internal/memory/sqlite"
 )
 
@@ -231,6 +232,11 @@ func TestUserFacingError(t *testing.T) {
 			name: "max tool iterations",
 			err:  domain.ErrMaxToolIterations,
 			want: "the tool call limit was reached before finalizing. try rephrasing your question more specifically",
+		},
+		{
+			name: "mcp session unavailable",
+			err:  fmt.Errorf("tool failed: %w", mcp.ErrSessionUnavailable),
+			want: "MCP tool execution is temporarily unavailable for one server, please try again",
 		},
 		{
 			name: "wrapped max tool iterations",

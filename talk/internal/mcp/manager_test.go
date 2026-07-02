@@ -27,11 +27,15 @@ func mcpTool(name, description string, inputSchema any) mcp.Tool {
 type stubRegistry struct {
 	configs []ServerConfig
 	err     error
+	getFunc func(context.Context, string) (ServerConfig, error)
 }
 
 func (r *stubRegistry) Add(_ context.Context, _ ServerConfig) error { return nil }
 func (r *stubRegistry) Remove(_ context.Context, _ string) error    { return nil }
-func (r *stubRegistry) Get(_ context.Context, _ string) (ServerConfig, error) {
+func (r *stubRegistry) Get(ctx context.Context, id string) (ServerConfig, error) {
+	if r.getFunc != nil {
+		return r.getFunc(ctx, id)
+	}
 	return ServerConfig{}, nil
 }
 func (r *stubRegistry) List(_ context.Context) ([]ServerConfig, error) {
@@ -199,6 +203,8 @@ func TestBuildHTTPClient_APIKey(t *testing.T) {
 
 func TestToolAdapter_InputSchema_Nil(t *testing.T) {
 	adapter := &mcpToolAdapter{
+		manager:    NewManager(&stubRegistry{}),
+		serverID:   "srv-1",
 		serverName: "test-server",
 		tool:       mcpTool("my-tool", "does things", nil),
 	}
@@ -219,6 +225,8 @@ func TestToolAdapter_InputSchema_Nil(t *testing.T) {
 
 func TestToolAdapter_OutputSchema(t *testing.T) {
 	adapter := &mcpToolAdapter{
+		manager:    NewManager(&stubRegistry{}),
+		serverID:   "srv-1",
 		serverName: "test-server",
 		tool:       mcpTool("my-tool", "does things", nil),
 	}
@@ -233,6 +241,8 @@ func TestToolAdapter_OutputSchema(t *testing.T) {
 
 func TestToolAdapter_InputSchema_MapDirectAssertion(t *testing.T) {
 	adapter := &mcpToolAdapter{
+		manager:    NewManager(&stubRegistry{}),
+		serverID:   "srv-1",
 		serverName: "test-server",
 		tool: mcpTool("my-tool", "does things", map[string]any{
 			"type": "object",
@@ -257,6 +267,8 @@ func TestToolAdapter_InputSchema_FallbackMarshalUnmarshal(t *testing.T) {
 	}
 
 	adapter := &mcpToolAdapter{
+		manager:    NewManager(&stubRegistry{}),
+		serverID:   "srv-1",
 		serverName: "test-server",
 		tool:       mcpTool("my-tool", "does things", schemaDTO{Type: "object"}),
 	}
@@ -289,8 +301,8 @@ func TestManager_RebuildToolsExcludingFiltersByServerName(t *testing.T) {
 		{Config: ServerConfig{ID: "srv-2", Name: "beta"}},
 	}
 	m.tools = []domain.Tool{
-		&mcpToolAdapter{serverName: "alpha", tool: mcp.Tool{Name: "tool-a"}},
-		&mcpToolAdapter{serverName: "beta", tool: mcp.Tool{Name: "tool-b"}},
+		&mcpToolAdapter{serverID: "srv-1", serverName: "alpha", tool: mcp.Tool{Name: "tool-a"}},
+		&mcpToolAdapter{serverID: "srv-2", serverName: "beta", tool: mcp.Tool{Name: "tool-b"}},
 	}
 
 	m.rebuildToolsExcluding("srv-1")
@@ -342,10 +354,12 @@ func TestToolAdapter_Execute_Success(t *testing.T) {
 	defer func() { _ = session.Close() }()
 
 	adapter := &mcpToolAdapter{
+		manager:    NewManager(&stubRegistry{}),
+		serverID:   "srv-1",
 		serverName: "test-server",
 		tool:       mcpTool("echo", "echoes text", nil),
-		session:    session,
 	}
+	adapter.manager.sessions["srv-1"] = session
 
 	got, err := adapter.Execute(context.Background(), map[string]any{"msg": "hello"})
 	if err != nil {
@@ -370,10 +384,12 @@ func TestToolAdapter_Execute_ToolError(t *testing.T) {
 	defer func() { _ = session.Close() }()
 
 	adapter := &mcpToolAdapter{
+		manager:    NewManager(&stubRegistry{}),
+		serverID:   "srv-1",
 		serverName: "test-server",
 		tool:       mcpTool("fail", "always fails", nil),
-		session:    session,
 	}
+	adapter.manager.sessions["srv-1"] = session
 
 	_, err := adapter.Execute(context.Background(), map[string]any{})
 	if err == nil {
@@ -381,5 +397,121 @@ func TestToolAdapter_Execute_ToolError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `calling tool "fail" on server "test-server"`) {
 		t.Fatalf("unexpected Execute() error: %v", err)
+	}
+}
+
+func TestManager_EnsureConnected_ReconnectsMissingSession(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "test-server", Version: "v0.0.1"}, nil)
+	server.AddTool(&mcp.Tool{
+		Name:        "echo",
+		Description: "echoes text",
+		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+	}, func(_ context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "ok"}}}, nil
+	})
+
+	session := connectInMemorySession(t, server)
+	registry := &stubRegistry{
+		getFunc: func(_ context.Context, id string) (ServerConfig, error) {
+			if id != "srv-1" {
+				t.Fatalf("unexpected server id: %s", id)
+			}
+			return ServerConfig{ID: "srv-1", Name: "test-server", URL: "in-memory"}, nil
+		},
+	}
+
+	manager := NewManager(registry)
+	manager.dial = func(context.Context, ServerConfig) (*mcp.ClientSession, error) {
+		return session, nil
+	}
+
+	got, err := manager.EnsureConnected(context.Background(), "srv-1")
+	if err != nil {
+		t.Fatalf("EnsureConnected() error = %v", err)
+	}
+	if got != session {
+		t.Fatalf("EnsureConnected() returned unexpected session")
+	}
+	if len(manager.Tools()) != 1 {
+		t.Fatalf("expected 1 tool after reconnect, got %d", len(manager.Tools()))
+	}
+	defer func() { _ = got.Close() }()
+}
+
+func TestToolAdapter_Execute_ReconnectsAndRetries(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "test-server", Version: "v0.0.1"}, nil)
+	server.AddTool(&mcp.Tool{
+		Name:        "echo",
+		Description: "echoes text",
+		InputSchema: map[string]any{"type": "object", "properties": map[string]any{"msg": map[string]any{"type": "string"}}},
+	}, func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Msg string `json:"msg"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "echo:" + args.Msg}}}, nil
+	})
+
+	brokenSession := connectInMemorySession(t, server)
+	_ = brokenSession.Close()
+	reconnectedSession := connectInMemorySession(t, server)
+
+	registry := &stubRegistry{
+		getFunc: func(_ context.Context, id string) (ServerConfig, error) {
+			return ServerConfig{ID: id, Name: "test-server", URL: "in-memory"}, nil
+		},
+	}
+	manager := NewManager(registry)
+	manager.sessions["srv-1"] = brokenSession
+	manager.dial = func(context.Context, ServerConfig) (*mcp.ClientSession, error) {
+		return reconnectedSession, nil
+	}
+
+	adapter := &mcpToolAdapter{
+		manager:    manager,
+		serverID:   "srv-1",
+		serverName: "test-server",
+		tool:       mcpTool("echo", "echoes text", nil),
+	}
+
+	got, err := adapter.Execute(context.Background(), map[string]any{"msg": "hello"})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got["content"] != "echo:hello" {
+		t.Fatalf("Execute() content = %v, want %q", got["content"], "echo:hello")
+	}
+	defer func() { _ = reconnectedSession.Close() }()
+}
+
+func TestToolAdapter_Execute_ReturnsFriendlyReconnectFailure(t *testing.T) {
+	registry := &stubRegistry{
+		getFunc: func(_ context.Context, id string) (ServerConfig, error) {
+			return ServerConfig{ID: id, Name: "test-server", URL: "in-memory"}, nil
+		},
+	}
+	manager := NewManager(registry)
+	manager.dial = func(context.Context, ServerConfig) (*mcp.ClientSession, error) {
+		return nil, errors.New("connection refused")
+	}
+
+	adapter := &mcpToolAdapter{
+		manager:    manager,
+		serverID:   "srv-1",
+		serverName: "test-server",
+		tool:       mcpTool("echo", "echoes text", nil),
+	}
+
+	_, err := adapter.Execute(context.Background(), map[string]any{"msg": "hello"})
+	if err == nil {
+		t.Fatal("expected Execute() error")
+	}
+	if !strings.Contains(err.Error(), `MCP tool execution is unavailable for server "test-server"`) {
+		t.Fatalf("unexpected Execute() error: %v", err)
+	}
+	if !errors.Is(err, ErrSessionUnavailable) {
+		t.Fatalf("expected ErrSessionUnavailable, got %v", err)
 	}
 }

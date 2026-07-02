@@ -243,6 +243,8 @@ func userFacingError(err error) error {
 		return fmt.Errorf("the tool call limit was reached before finalizing. try rephrasing your question more specifically")
 	case errors.As(err, new(*sqlitestore.ErrStore)):
 		return fmt.Errorf("service temporarily unavailable, please try again")
+	case errors.Is(err, mcp.ErrSessionUnavailable):
+		return fmt.Errorf("MCP tool execution is temporarily unavailable for one server, please try again")
 	default:
 		return fmt.Errorf("an unexpected error occurred, please try again")
 	}
