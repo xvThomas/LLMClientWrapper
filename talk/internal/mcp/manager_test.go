@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -294,7 +297,7 @@ func TestToolAdapter_ExtractTextContent(t *testing.T) {
 	}
 }
 
-func TestManager_RebuildToolsExcludingFiltersByServerName(t *testing.T) {
+func TestManager_Disconnect_FiltersToolsAndStatuses(t *testing.T) {
 	m := NewManager(&stubRegistry{})
 	m.statuses = []ServerStatus{
 		{Config: ServerConfig{ID: "srv-1", Name: "alpha"}},
@@ -305,16 +308,16 @@ func TestManager_RebuildToolsExcludingFiltersByServerName(t *testing.T) {
 		&mcpToolAdapter{serverID: "srv-2", serverName: "beta", tool: mcp.Tool{Name: "tool-b"}},
 	}
 
-	m.rebuildToolsExcluding("srv-1")
+	m.Disconnect("srv-1")
 
 	if len(m.tools) != 1 {
-		t.Fatalf("expected 1 tool after exclude, got %d", len(m.tools))
+		t.Fatalf("expected 1 tool after disconnect, got %d", len(m.tools))
 	}
 	if adapter, ok := m.tools[0].(*mcpToolAdapter); !ok || adapter.serverName != "beta" {
 		t.Fatalf("remaining tool server = %v, want beta", m.tools[0])
 	}
 	if len(m.statuses) != 1 || m.statuses[0].Config.ID != "srv-2" {
-		t.Fatalf("unexpected statuses after exclude: %+v", m.statuses)
+		t.Fatalf("unexpected statuses after disconnect: %+v", m.statuses)
 	}
 }
 
@@ -514,4 +517,94 @@ func TestToolAdapter_Execute_ReturnsFriendlyReconnectFailure(t *testing.T) {
 	if !errors.Is(err, ErrSessionUnavailable) {
 		t.Fatalf("expected ErrSessionUnavailable, got %v", err)
 	}
+}
+
+func TestIsReconnectableCallError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil, want: false},
+		{name: "io eof", err: io.EOF, want: true},
+		{name: "wrapped io eof", err: fmt.Errorf("wrapped: %w", io.EOF), want: true},
+		{name: "net err closed", err: net.ErrClosed, want: true},
+		{name: "net op error", err: &net.OpError{Op: "read", Net: "tcp", Err: errors.New("boom")}, want: true},
+		{name: "string marker broken pipe", err: errors.New("write: broken pipe"), want: true},
+		{name: "string marker transport closing", err: errors.New("transport is closing"), want: true},
+		{name: "connection refused not reconnectable", err: errors.New("connection refused"), want: false},
+		{name: "arbitrary error", err: errors.New("arbitrary failure"), want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isReconnectableCallError(tt.err)
+			if got != tt.want {
+				t.Fatalf("isReconnectableCallError(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestManager_RefreshAndReconnect_ConcurrentSmoke(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "test-server", Version: "v0.0.1"}, nil)
+	server.AddTool(&mcp.Tool{
+		Name:        "echo",
+		Description: "echoes text",
+		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+	}, func(_ context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "ok"}}}, nil
+	})
+
+	sharedSession := connectInMemorySession(t, server)
+
+	registry := &stubRegistry{
+		getFunc: func(_ context.Context, id string) (ServerConfig, error) {
+			return ServerConfig{ID: id, Name: "test-server", URL: "in-memory"}, nil
+		},
+	}
+
+	manager := NewManager(registry)
+	manager.dial = func(context.Context, ServerConfig) (*mcp.ClientSession, error) {
+		return sharedSession, nil
+	}
+
+	status, err := manager.Connect(context.Background(), ServerConfig{ID: "srv-1", Name: "test-server", URL: "in-memory"})
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if !status.Connected {
+		t.Fatalf("expected initial connected status")
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				_ = manager.Refresh(context.Background())
+			}
+		}()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				_, reconnectErr := manager.Reconnect(context.Background(), "srv-1")
+				if reconnectErr != nil {
+					t.Errorf("Reconnect() error = %v", reconnectErr)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	if len(manager.Tools()) == 0 {
+		t.Fatalf("expected at least one tool after concurrent refresh/reconnect")
+	}
+	if len(manager.Statuses()) == 0 {
+		t.Fatalf("expected at least one status after concurrent refresh/reconnect")
+	}
+
+	manager.Close()
 }

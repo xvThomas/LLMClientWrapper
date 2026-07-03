@@ -236,7 +236,7 @@ func TestUserFacingError(t *testing.T) {
 		{
 			name: "mcp session unavailable",
 			err:  fmt.Errorf("tool failed: %w", mcp.ErrSessionUnavailable),
-			want: "MCP tool execution is temporarily unavailable for one server, please try again",
+			want: "MCP tool execution is temporarily unavailable for an MCP server, please try again",
 		},
 		{
 			name: "wrapped max tool iterations",

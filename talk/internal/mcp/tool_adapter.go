@@ -83,7 +83,7 @@ func (a *mcpToolAdapter) Execute(ctx context.Context, input map[string]any) (map
 			Arguments: input,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("calling tool %q on server %q after reconnect: %w", a.tool.Name, a.serverName, err)
+			return nil, fmt.Errorf("%w: calling tool %q on server %q after reconnect: %v", ErrSessionUnavailable, a.tool.Name, a.serverName, err)
 		}
 	}
 	if result.IsError {
