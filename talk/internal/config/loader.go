@@ -61,13 +61,6 @@ func Load(envFile string) (*Config, error) {
 	return cfg, nil
 }
 
-func requireKey(value, name string) (string, error) {
-	if value == "" {
-		return "", fmt.Errorf("%w %q", ErrMissingEnvVar, name)
-	}
-	return value, nil
-}
-
 // GetKeyValue is a helper function to get an environment variable value or empty string if not set.
 func GetKeyValue(name string) string {
 	return os.Getenv(name)
