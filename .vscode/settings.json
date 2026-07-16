@@ -1,42 +1,43 @@
 {
-    "cSpell.language": "en,fr",
-    "cSpell.allowCompoundWords": true,
-    "cSpell.words": [
-        "AIAPI",
-        "bbox",
-        "bdtopo",
-        "Errorf",
-        "Getenv",
-        "godotenv",
-        "golangci",
-        "inmemory",
-        "itineraire",
-        "joho",
-        "jwks",
-        "ldflags",
-        "malibu",
-        "mcpserver",
-        "mytool",
-        "numero",
-        "oauthex",
-        "openai",
-        "osrm",
-        "sess",
-        "sqlite",
-        "sqlitestore",
-        "testdata",
-        "tmpl",
-        "unmarshalling",
-        "unmaterialized",
-        "upserting"
-    ],
-    "chat.tools.terminal.autoApprove": {
-        "go": true
-    },
-    "go.coverOnSave": true,
-    "go.coverageDecorator": {
-        "type": "gutter",
-        "coveredGutterStyle": "blockblue",
-        "uncoveredGutterStyle": "blockred"
-    }
+  "cSpell.allowCompoundWords": true,
+  "cSpell.language": "en,fr",
+  "cSpell.words": [
+    "AIAPI",
+    "bbox",
+    "bdtopo",
+    "Errorf",
+    "Getenv",
+    "godotenv",
+    "golangci",
+    "inmemory",
+    "itineraire",
+    "joho",
+    "jwks",
+    "ldflags",
+    "malibu",
+    "mcpserver",
+    "mytool",
+    "numero",
+    "oauthex",
+    "openai",
+    "osrm",
+    "sess",
+    "sqlite",
+    "sqlitestore",
+    "testdata",
+    "tmpl",
+    "unmarshalling",
+    "unmaterialized",
+    "upserting"
+  ],
+  "chat.tools.terminal.autoApprove": {
+    "go": true
+  },
+  "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+  "go.coverOnSave": true,
+  "go.coverageDecorator": {
+    "coveredGutterStyle": "blockblue",
+    "type": "gutter",
+    "uncoveredGutterStyle": "blockred"
+  }
 }
