@@ -14,8 +14,8 @@ var ErrMissingEnvVar = errors.New("missing required environment variable")
 
 // Config holds all configuration loaded from environment variables.
 type Config struct {
-	ToolsMaxConcurrent   int // Max concurrent tool executions (default: 4)
-	ContextFullTurns     int // Context mode selector: -1 full, 0 lean, N hybrid:N
+	ToolsMaxConcurrent int // Max concurrent tool executions (default: 4)
+	ContextFullTurns   int // Context mode selector: -1 full, 0 lean, N hybrid:N
 
 	// Langfuse configuration
 	LangfuseSecretKey string // LANGFUSE_SECRET_KEY="sk-lf-..."
@@ -39,8 +39,8 @@ func Load(envFile string) (*Config, error) {
 	_ = godotenv.Load(envFile)
 
 	cfg := &Config{
-		ToolsMaxConcurrent:   parseToolsMaxConcurrent(os.Getenv("TOOLS_MAX_CONCURRENT")),
-		ContextFullTurns:     parseContextFullTurns(os.Getenv("CONTEXT_FULL_TURNS")),
+		ToolsMaxConcurrent: parseToolsMaxConcurrent(os.Getenv("TOOLS_MAX_CONCURRENT")),
+		ContextFullTurns:   parseContextFullTurns(os.Getenv("CONTEXT_FULL_TURNS")),
 
 		// Langfuse configuration
 		LangfuseSecretKey: os.Getenv("LANGFUSE_SECRET_KEY"),

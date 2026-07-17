@@ -70,6 +70,7 @@ fmt: ## Format code (go fmt + goimports) for all modules
 build: ## Build all binaries
 	@$(MAKE) -C talk build
 	@$(MAKE) -C mcp-owm build
+	@$(MAKE) -C mcp-ign-nav build
 	@$(MAKE) -C mcp-playground build
 
 clean: ## Remove build artifacts from all modules
