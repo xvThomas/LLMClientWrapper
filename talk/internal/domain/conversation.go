@@ -16,9 +16,9 @@ var ErrSystemPrompt = errors.New("loading system prompt")
 // ErrMaxToolIterations is returned when the tool execution loop exhausts its iteration budget.
 var ErrMaxToolIterations = errors.New("maximum tool call iterations exceeded")
 
-const maxToolCalls = 5
+const maxToolCalls = 2
 
-// Turn status constants.
+// Turn status constants
 const (
 	TurnStatusComplete   = "complete"
 	TurnStatusIncomplete = "incomplete"

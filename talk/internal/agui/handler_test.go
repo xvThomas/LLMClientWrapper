@@ -886,6 +886,32 @@ func TestHandler_Resume_Resolved_ContinuesChat(t *testing.T) {
 	}
 }
 
+func TestHandler_Resume_Resolved_AppendsContinuationPromptWhenMessagesExist(t *testing.T) {
+	var receivedMessages []types.Message
+	chatFn := func(_ context.Context, _ string, _ string, messages []types.Message, opts ChatOptions) error {
+		receivedMessages = messages
+		emitter := NewAGUIEmitter(opts.SSEWriter, nil)
+		return emitter.HandleMessageEvent(context.Background(), domain.MessageEvent{
+			Message: domain.Message{Role: domain.RoleAssistant, Content: "continued"},
+		})
+	}
+
+	handler := NewHandler(nil, chatFn, []string{"sonnet-4.6"})
+
+	body := `{"threadId":"t1","messages":[{"id":"m1","role":"user","content":"original question"}],"resume":[{"interruptId":"int-1","status":"resolved"}],"forwardedProps":{"model":"sonnet-4.6"}}`
+	req := httptest.NewRequest(http.MethodPost, "/agent", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if len(receivedMessages) != 2 {
+		t.Fatalf("len(messages) = %d, want 2 (original message + continuation prompt)", len(receivedMessages))
+	}
+	if receivedMessages[len(receivedMessages)-1].Content != "Please continue where you left off." {
+		t.Errorf("last message = %v, want continuation prompt", receivedMessages[len(receivedMessages)-1].Content)
+	}
+}
+
 func TestHandler_Resume_Cancelled_EmitsRunFinished(t *testing.T) {
 	chatFnCalled := false
 	chatFn := func(_ context.Context, _ string, _ string, _ []types.Message, _ ChatOptions) error {

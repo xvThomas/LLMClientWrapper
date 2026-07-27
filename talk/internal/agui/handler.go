@@ -51,6 +51,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.log.Info("Received /agent request", "input", input)
+
 	if len(input.Messages) == 0 && len(input.Resume) == 0 {
 		http.Error(w, `{"error":"messages field is required"}`, http.StatusBadRequest)
 		return
@@ -99,13 +101,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Resolved: inject a continuation user message if messages are empty.
-		if len(input.Messages) == 0 {
-			input.Messages = []types.Message{{
-				Role:    "user",
-				Content: "Please continue where you left off.",
-			}}
-		}
+		// Resolved: append a continuation prompt so the resumed run can continue from the interrupted turn.
+		input.Messages = append(input.Messages, types.Message{
+			Role:    "user",
+			Content: "Please continue where you left off.",
+		})
 	}
 
 	// Extract model alias from forwardedProps.
