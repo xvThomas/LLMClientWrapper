@@ -942,6 +942,32 @@ func TestHandler_Resume_Cancelled_EmitsRunFinished(t *testing.T) {
 	assertEventType(t, evts[1], events.EventTypeRunFinished)
 }
 
+func TestHandler_Resume_Cancelled_WithNewMessage_ProcessesChat(t *testing.T) {
+	var gotMessages []types.Message
+	chatFn := func(_ context.Context, _ string, _ string, messages []types.Message, _ ChatOptions) error {
+		gotMessages = messages
+		return nil
+	}
+
+	handler := NewHandler(nil, chatFn, []string{"sonnet-4.6"})
+
+	body := `{"threadId":"t1","messages":[{"id":"m1","role":"user","content":"Distance entre Lyon et Marseille"}],"resume":[{"interruptId":"int-1","status":"cancelled"}],"forwardedProps":{"model":"sonnet-4.6"}}`
+	req := httptest.NewRequest(http.MethodPost, "/agent", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if gotMessages == nil {
+		t.Fatal("chatFn should be called when a cancelled resume carries a new user message")
+	}
+	if len(gotMessages) != 1 {
+		t.Fatalf("got %d messages, want 1 (no continuation prompt appended)", len(gotMessages))
+	}
+	if gotMessages[0].Content != "Distance entre Lyon et Marseille" {
+		t.Errorf("unexpected message content: %q", gotMessages[0].Content)
+	}
+}
+
 func TestHandler_Resume_MissingThreadID_Returns400(t *testing.T) {
 	handler := NewHandler(nil, nil, []string{"sonnet-4.6"})
 

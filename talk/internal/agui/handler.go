@@ -86,26 +86,32 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if hasCancelled {
-			sse, sseErr := NewSSEWriter(w, h.log)
-			if sseErr != nil {
-				http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
+			// Cancellation discards the interrupted turn. When the user also
+			// submitted a new message (the last message is from the user),
+			// process it normally without a continuation prompt. Otherwise
+			// there is nothing to run, so finish the run immediately.
+			if !lastMessageIsUser(input.Messages) {
+				sse, sseErr := NewSSEWriter(w, h.log)
+				if sseErr != nil {
+					http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
+					return
+				}
+				threadID := input.ThreadID
+				runID := input.RunID
+				if runID == "" {
+					runID = uuid.New().String()
+				}
+				_ = sse.WriteEvent(r.Context(), events.NewRunStartedEvent(threadID, runID))
+				_ = sse.WriteEvent(r.Context(), events.NewRunFinishedEvent(threadID, runID))
 				return
 			}
-			threadID := input.ThreadID
-			runID := input.RunID
-			if runID == "" {
-				runID = uuid.New().String()
-			}
-			_ = sse.WriteEvent(r.Context(), events.NewRunStartedEvent(threadID, runID))
-			_ = sse.WriteEvent(r.Context(), events.NewRunFinishedEvent(threadID, runID))
-			return
+		} else {
+			// Resolved: append a continuation prompt so the resumed run can continue from the interrupted turn.
+			input.Messages = append(input.Messages, types.Message{
+				Role:    "user",
+				Content: "Please continue where you left off.",
+			})
 		}
-
-		// Resolved: append a continuation prompt so the resumed run can continue from the interrupted turn.
-		input.Messages = append(input.Messages, types.Message{
-			Role:    "user",
-			Content: "Please continue where you left off.",
-		})
 	}
 
 	// Extract model alias from forwardedProps.
@@ -232,6 +238,15 @@ func (h *Handler) isModelSupported(alias string) bool {
 		}
 	}
 	return false
+}
+
+// lastMessageIsUser reports whether the final message in the slice is from the
+// user, indicating a new turn to process rather than a bare interrupt cancel.
+func lastMessageIsUser(messages []types.Message) bool {
+	if len(messages) == 0 {
+		return false
+	}
+	return messages[len(messages)-1].Role == "user"
 }
 
 // extractThinkingEffort extracts the thinking effort level from forwardedProps.
