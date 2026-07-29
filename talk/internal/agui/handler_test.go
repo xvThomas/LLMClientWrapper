@@ -535,13 +535,13 @@ func TestExtractThinkingEffort(t *testing.T) {
 		props any
 		want  domain.ThinkingEffort
 	}{
-		{name: "nil props", props: nil, want: ""},
-		{name: "not a map", props: "string", want: ""},
-		{name: "missing key", props: map[string]any{"model": "x"}, want: ""},
-		{name: "empty string", props: map[string]any{"thinkingEffort": ""}, want: ""},
-		{name: "off", props: map[string]any{"thinkingEffort": "off"}, want: ""},
-		{name: "invalid value", props: map[string]any{"thinkingEffort": "extreme"}, want: ""},
-		{name: "non-string value", props: map[string]any{"thinkingEffort": 42}, want: ""},
+		{name: "nil props", props: nil, want: domain.ThinkingOff},
+		{name: "not a map", props: "string", want: domain.ThinkingOff},
+		{name: "missing key", props: map[string]any{"model": "x"}, want: domain.ThinkingOff},
+		{name: "empty string", props: map[string]any{"thinkingEffort": ""}, want: domain.ThinkingOff},
+		{name: "off", props: map[string]any{"thinkingEffort": "off"}, want: domain.ThinkingOff},
+		{name: "invalid value", props: map[string]any{"thinkingEffort": "extreme"}, want: domain.ThinkingOff},
+		{name: "non-string value", props: map[string]any{"thinkingEffort": 42}, want: domain.ThinkingOff},
 		{name: "low", props: map[string]any{"thinkingEffort": "low"}, want: domain.ThinkingLow},
 		{name: "medium", props: map[string]any{"thinkingEffort": "medium"}, want: domain.ThinkingMedium},
 		{name: "high", props: map[string]any{"thinkingEffort": "high"}, want: domain.ThinkingHigh},
@@ -711,8 +711,8 @@ func TestHandler_InvalidThinkingEffortDefaultsOff(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if receivedEffort != "" {
-		t.Errorf("chatFn received thinkingEffort = %q, want empty (off)", receivedEffort)
+	if receivedEffort != domain.ThinkingOff {
+		t.Errorf("chatFn received thinkingEffort = %q, want %q", receivedEffort, domain.ThinkingOff)
 	}
 }
 

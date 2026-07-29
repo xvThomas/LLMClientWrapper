@@ -45,100 +45,122 @@ func NewHandler(log *slog.Logger, chatFn ChatFunc, supportedModels []string) *Ha
 
 // ServeHTTP handles POST /agent requests.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	input, ok := h.parseRequest(w, r)
+	if !ok {
+		return
+	}
+
+	if done := h.handleResume(w, r, &input); done {
+		return
+	}
+
+	modelAlias, thinkingEffort, ok := h.resolveForwardedProps(w, r, input)
+	if !ok {
+		return
+	}
+
+	h.streamChat(w, r, input, modelAlias, thinkingEffort)
+}
+
+// parseRequest decodes the JSON body and validates that either messages or
+// resume entries are present.
+func (h *Handler) parseRequest(w http.ResponseWriter, r *http.Request) (types.RunAgentInput, bool) {
 	var input types.RunAgentInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
-		return
+		return input, false
 	}
 
 	h.log.Info("Received /agent request", "input", input)
 
 	if len(input.Messages) == 0 && len(input.Resume) == 0 {
 		http.Error(w, `{"error":"messages field is required"}`, http.StatusBadRequest)
-		return
+		return input, false
 	}
 
-	// Handle resume after interrupt: validate and route.
-	if len(input.Resume) > 0 {
-		// ThreadID is required for resume — cannot correlate without it.
-		if input.ThreadID == "" {
-			http.Error(w, `{"error":"threadId is required when resuming an interrupt"}`, http.StatusBadRequest)
-			return
-		}
+	return input, true
+}
 
-		// Validate all resume entries have a known status and no conflicts.
-		hasResolved := false
-		hasCancelled := false
-		for _, entry := range input.Resume {
-			switch entry.Status {
-			case types.ResumeStatusResolved:
-				hasResolved = true
-			case types.ResumeStatusCancelled:
-				hasCancelled = true
-			default:
-				http.Error(w, `{"error":"unknown resume status, expected resolved or cancelled"}`, http.StatusBadRequest)
-				return
-			}
-		}
-		if hasResolved && hasCancelled {
-			http.Error(w, `{"error":"conflicting resume statuses: cannot mix resolved and cancelled"}`, http.StatusBadRequest)
-			return
-		}
-
-		if hasCancelled {
-			// Cancellation discards the interrupted turn. When the user also
-			// submitted a new message (the last message is from the user),
-			// process it normally without a continuation prompt. Otherwise
-			// there is nothing to run, so finish the run immediately.
-			if !lastMessageIsUser(input.Messages) {
-				sse, sseErr := NewSSEWriter(w, h.log)
-				if sseErr != nil {
-					http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
-					return
-				}
-				threadID := input.ThreadID
-				runID := input.RunID
-				if runID == "" {
-					runID = uuid.New().String()
-				}
-				_ = sse.WriteEvent(r.Context(), events.NewRunStartedEvent(threadID, runID))
-				_ = sse.WriteEvent(r.Context(), events.NewRunFinishedEvent(threadID, runID))
-				return
-			}
-		} else {
-			// Resolved: append a continuation prompt so the resumed run can continue from the interrupted turn.
-			input.Messages = append(input.Messages, types.Message{
-				Role:    "user",
-				Content: "Please continue where you left off.",
-			})
-		}
+// handleResume validates and routes a resume request. It mutates the input in
+// place (appending the continuation prompt for resolved resumes) and returns
+// done=true when the response has already been written (cancelled with no new
+// user message) or when an error response was sent.
+func (h *Handler) handleResume(w http.ResponseWriter, r *http.Request, input *types.RunAgentInput) (done bool) {
+	if len(input.Resume) == 0 {
+		return false
 	}
 
-	// Extract model alias from forwardedProps.
+	if input.ThreadID == "" {
+		http.Error(w, `{"error":"threadId is required when resuming an interrupt"}`, http.StatusBadRequest)
+		return true
+	}
+
+	hasResolved, hasCancelled, valid := classifyResumeStatuses(input.Resume)
+	if !valid {
+		http.Error(w, `{"error":"unknown resume status, expected resolved or cancelled"}`, http.StatusBadRequest)
+		return true
+	}
+	if hasResolved && hasCancelled {
+		http.Error(w, `{"error":"conflicting resume statuses: cannot mix resolved and cancelled"}`, http.StatusBadRequest)
+		return true
+	}
+
+	if hasCancelled {
+		return h.handleCancelledResume(w, r, input)
+	}
+
+	// Resolved: append a continuation prompt so the model continues from where it left off.
+	input.Messages = append(input.Messages, types.Message{
+		Role:    "user",
+		Content: "Please continue where you left off.",
+	})
+	return false
+}
+
+// handleCancelledResume handles the cancelled resume case. When the user has
+// not sent a new message, it emits an empty run and signals done. When a new
+// user message is present, it falls through to normal chat processing.
+func (h *Handler) handleCancelledResume(w http.ResponseWriter, r *http.Request, input *types.RunAgentInput) (done bool) {
+	if lastMessageIsUser(input.Messages) {
+		return false
+	}
+
+	sse, err := NewSSEWriter(w, h.log)
+	if err != nil {
+		http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
+		return true
+	}
+
+	runID := input.RunID
+	if runID == "" {
+		runID = uuid.New().String()
+	}
+	_ = sse.WriteEvent(r.Context(), events.NewRunStartedEvent(input.ThreadID, runID))
+	_ = sse.WriteEvent(r.Context(), events.NewRunFinishedEvent(input.ThreadID, runID))
+	return true
+}
+
+// resolveForwardedProps extracts and validates all values from forwardedProps.
+// modelAlias is required; an SSE RUN_ERROR is written and ok=false is returned
+// if it is missing or unsupported. thinkingEffort is optional and defaults to off.
+func (h *Handler) resolveForwardedProps(w http.ResponseWriter, r *http.Request, input types.RunAgentInput) (modelAlias string, thinkingEffort domain.ThinkingEffort, ok bool) {
 	modelAlias, err := extractModelAlias(input.ForwardedProps)
 	if err != nil {
-		sse, sseErr := NewSSEWriter(w, h.log)
-		if sseErr != nil {
-			http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
-			return
-		}
-		msg := fmt.Sprintf("%s Available models: %s.", err.Error(), strings.Join(h.supportedModels, ", "))
-		_ = sse.WriteEvent(r.Context(), events.NewRunErrorEvent(msg))
-		return
+		h.writeSSEError(w, r, fmt.Sprintf("%s Available models: %s.", err.Error(), strings.Join(h.supportedModels, ", ")))
+		return "", "", false
 	}
 
-	// Validate model is in the supported list.
 	if !h.isModelSupported(modelAlias) {
-		sse, sseErr := NewSSEWriter(w, h.log)
-		if sseErr != nil {
-			http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
-			return
-		}
-		msg := fmt.Sprintf("Unknown model %q. Available models: %s.", modelAlias, strings.Join(h.supportedModels, ", "))
-		_ = sse.WriteEvent(r.Context(), events.NewRunErrorEvent(msg))
-		return
+		h.writeSSEError(w, r, fmt.Sprintf("Unknown model %q. Available models: %s.", modelAlias, strings.Join(h.supportedModels, ", ")))
+		return "", "", false
 	}
 
+	return modelAlias, extractThinkingEffort(input.ForwardedProps), true
+}
+
+// streamChat opens an SSE stream and runs the full chat lifecycle:
+// RUN_STARTED → chatFn → RUN_FINISHED (or interrupt/error event).
+func (h *Handler) streamChat(w http.ResponseWriter, r *http.Request, input types.RunAgentInput, modelAlias string, thinkingEffort domain.ThinkingEffort) {
 	sse, err := NewSSEWriter(w, h.log)
 	if err != nil {
 		http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
@@ -149,7 +171,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if threadID == "" {
 		threadID = uuid.New().String()
 	}
-
 	runID := input.RunID
 	if runID == "" {
 		runID = uuid.New().String()
@@ -157,72 +178,110 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// RUN_STARTED
 	if err := sse.WriteEvent(ctx, events.NewRunStartedEvent(threadID, runID)); err != nil {
 		h.log.Error("writing RUN_STARTED", slog.String("error", err.Error()))
 		return
 	}
 
-	// Get response from chat function.
 	if h.chatFn != nil {
-		thinkingEffort := extractThinkingEffort(input.ForwardedProps)
-		err = h.chatFn(ctx, threadID, modelAlias, input.Messages, ChatOptions{
-			SSEWriter:      sse,
-			ThinkingEffort: thinkingEffort,
-		})
-		if ctx.Err() != nil {
-			h.log.Debug("client disconnected during chat", slog.String("thread_id", threadID))
-			return
-		}
-		if err != nil {
-			if errors.Is(err, domain.ErrMaxToolIterations) {
-				interruptID := uuid.New().String()
-				finishedEvent := events.NewRunFinishedEventWithOptions(threadID, runID,
-					events.WithOutcome(events.RunFinishedOutcome{
-						Type: events.RunFinishedOutcomeTypeInterrupt,
-						Interrupts: []types.Interrupt{{
-							ID:      interruptID,
-							Reason:  "talk:max_iterations",
-							Message: "I reached the tool call limit. Click Continue to let me keep working.",
-						}},
-					}),
-				)
-				_ = sse.WriteEvent(ctx, finishedEvent)
-				return
-			}
-			_ = sse.WriteEvent(ctx, events.NewRunErrorEvent(err.Error()))
+		if done := h.runChat(ctx, sse, input, threadID, runID, modelAlias, thinkingEffort); done {
 			return
 		}
 	}
 
-	// RUN_FINISHED
 	if ctx.Err() != nil {
 		h.log.Debug("client disconnected before RUN_FINISHED", slog.String("thread_id", threadID))
 		return
 	}
 	if err := sse.WriteEvent(ctx, events.NewRunFinishedEvent(threadID, runID)); err != nil {
 		h.log.Error("writing RUN_FINISHED", slog.String("error", err.Error()))
+	}
+}
+
+// runChat calls chatFn and emits the appropriate terminal SSE event on error.
+// Returns done=true when a terminal event has already been written.
+func (h *Handler) runChat(ctx context.Context, sse *SSEWriter, input types.RunAgentInput, threadID, runID, modelAlias string, thinkingEffort domain.ThinkingEffort) (done bool) {
+	err := h.chatFn(ctx, threadID, modelAlias, input.Messages, ChatOptions{
+		SSEWriter:      sse,
+		ThinkingEffort: thinkingEffort,
+	})
+
+	if ctx.Err() != nil {
+		h.log.Debug("client disconnected during chat", slog.String("thread_id", threadID))
+		return true
+	}
+
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, domain.ErrMaxToolIterations) {
+		finishedEvent := events.NewRunFinishedEventWithOptions(threadID, runID,
+			events.WithOutcome(events.RunFinishedOutcome{
+				Type: events.RunFinishedOutcomeTypeInterrupt,
+				Interrupts: []types.Interrupt{{
+					ID:      uuid.New().String(),
+					Reason:  "talk:max_iterations",
+					Message: "I reached the tool call limit. Click Continue to let me keep working.",
+				}},
+			}),
+		)
+		_ = sse.WriteEvent(ctx, finishedEvent)
+		return true
+	}
+
+	_ = sse.WriteEvent(ctx, events.NewRunErrorEvent(err.Error()))
+	return true
+}
+
+// writeSSEError opens an SSE stream solely to emit a RUN_ERROR event.
+func (h *Handler) writeSSEError(w http.ResponseWriter, r *http.Request, msg string) {
+	sse, err := NewSSEWriter(w, h.log)
+	if err != nil {
+		http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
 		return
 	}
+	_ = sse.WriteEvent(r.Context(), events.NewRunErrorEvent(msg))
+}
+
+// classifyResumeStatuses iterates the resume entries and returns whether any
+// resolved or cancelled statuses were found. valid is false if an unknown
+// status is encountered.
+func classifyResumeStatuses(entries []types.ResumeEntry) (hasResolved, hasCancelled, valid bool) {
+	for _, entry := range entries {
+		switch entry.Status {
+		case types.ResumeStatusResolved:
+			hasResolved = true
+		case types.ResumeStatusCancelled:
+			hasCancelled = true
+		default:
+			return false, false, false
+		}
+	}
+	return hasResolved, hasCancelled, true
 }
 
 // extractModelAlias extracts the model alias from forwardedProps.
 // Returns an error if forwardedProps is not a map or the model key is missing/empty.
 func extractModelAlias(forwardedProps any) (string, error) {
+	// Validate that forwardedProps is not nil
 	if forwardedProps == nil {
 		return "", fmt.Errorf("the model field is required")
 	}
 
+	// Validate that forwardedProps is a map[string]any
 	props, ok := forwardedProps.(map[string]any)
 	if !ok {
 		return "", fmt.Errorf("the model field is required")
 	}
 
+	// Check for the presence of the "model" key
 	modelRaw, exists := props["model"]
 	if !exists {
 		return "", fmt.Errorf("the model field is required")
 	}
 
+	// Validate that the model field is a non-empty string
 	model, ok := modelRaw.(string)
 	if !ok || model == "" {
 		return "", fmt.Errorf("the model field is required")
@@ -231,6 +290,7 @@ func extractModelAlias(forwardedProps any) (string, error) {
 	return model, nil
 }
 
+// isModelSupported checks if the given model alias is in the list of supported models.
 func (h *Handler) isModelSupported(alias string) bool {
 	for _, m := range h.supportedModels {
 		if m == alias {
@@ -240,33 +300,26 @@ func (h *Handler) isModelSupported(alias string) bool {
 	return false
 }
 
-// lastMessageIsUser reports whether the final message in the slice is from the
-// user, indicating a new turn to process rather than a bare interrupt cancel.
-func lastMessageIsUser(messages []types.Message) bool {
-	if len(messages) == 0 {
-		return false
-	}
-	return messages[len(messages)-1].Role == "user"
-}
-
 // extractThinkingEffort extracts the thinking effort level from forwardedProps.
-// Returns the zero value (empty string = off) for missing, invalid, or unrecognized values.
+// Returns ThinkingOff for missing, invalid, or unrecognized values.
 func extractThinkingEffort(forwardedProps any) domain.ThinkingEffort {
-	if forwardedProps == nil {
-		return ""
-	}
+	// Default to ThinkingOff if forwardedProps is nil or not a map.
 	props, ok := forwardedProps.(map[string]any)
 	if !ok {
-		return ""
+		return domain.ThinkingOff
 	}
+	// Default to ThinkingOff if the key is missing or the value is not a string.
 	raw, exists := props["thinkingEffort"]
 	if !exists {
-		return ""
+		return domain.ThinkingOff
 	}
+	// Map string values to ThinkingEffort constants.
 	value, ok := raw.(string)
 	if !ok {
-		return ""
+		return domain.ThinkingOff
 	}
+	// Return the corresponding ThinkingEffort constant, defaulting 
+	// to ThinkingOff for unrecognized values.
 	switch value {
 	case "low":
 		return domain.ThinkingLow
@@ -275,6 +328,15 @@ func extractThinkingEffort(forwardedProps any) domain.ThinkingEffort {
 	case "high":
 		return domain.ThinkingHigh
 	default:
-		return ""
+		return domain.ThinkingOff
 	}
+}
+
+// lastMessageIsUser reports whether the final message in the slice is from the
+// user, indicating a new turn to process rather than a bare interrupt cancel.
+func lastMessageIsUser(messages []types.Message) bool {
+	if len(messages) == 0 {
+		return false
+	}
+	return messages[len(messages)-1].Role == "user"
 }
