@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && bash ../talk-bmad/scripts/link-skills.sh .agents/skills 2>/dev/null || true",
+            "statusMessage": "Linking bmad + golang skills..."
+          }
+        ]
+      }
+    ]
+  }
+}
