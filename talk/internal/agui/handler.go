@@ -318,7 +318,7 @@ func extractThinkingEffort(forwardedProps any) domain.ThinkingEffort {
 	if !ok {
 		return domain.ThinkingOff
 	}
-	// Return the corresponding ThinkingEffort constant, defaulting 
+	// Return the corresponding ThinkingEffort constant, defaulting
 	// to ThinkingOff for unrecognized values.
 	switch value {
 	case "low":

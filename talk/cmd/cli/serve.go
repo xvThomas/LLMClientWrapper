@@ -86,64 +86,7 @@ func runServe(ctx context.Context, port string) error {
 	defer mcpManager.Close()
 
 	// ChatFunc resolves model per request from the alias passed by the handler.
-	chatFn := func(reqCtx context.Context, threadID string, modelAlias string, aguiMessages []types.Message, opts agui.ChatOptions) error {
-		client, err := llmRouter.Get(modelAlias)
-		if err != nil {
-			log.Error("resolving model", slog.String("model", modelAlias), slog.String("error", err.Error()))
-			return userFacingError(err)
-		}
-
-		modelDescriptor, err := domain.Lookup(modelAlias)
-		if err != nil {
-			log.Error("looking up model", slog.String("model", modelAlias), slog.String("error", err.Error()))
-			return userFacingError(err)
-		}
-
-		aguiEmitter := agui.NewAGUIEmitter(opts.SSEWriter, log)
-
-		handlers := domain.NewMessageEventHandlers([][]domain.MessageEventHandler{
-			{aguiEmitter, messages},
-		})
-
-		scope := domain.NewSessionScope(threadID, "anonymous")
-		manager := domain.NewConversationManager(domain.ConversationManagerConfig{
-			Client:             client,
-			ModelID:            modelAlias,
-			Scope:              scope,
-			Provider:           modelDescriptor.OLTPProvider,
-			Store:              messages,
-			SessionBrowser:     browser,
-			PromptProvider:     pp,
-			Tools:              mcpManager.Tools,
-			EventHandlers:      handlers,
-			MaxConcurrentTools: cfg.ToolsMaxConcurrent,
-			ContextFullTurns:   cfg.ContextFullTurns,
-		})
-
-		userInput := extractUserInput(aguiMessages)
-		if userInput == "" {
-			return fmt.Errorf("no user message found in request")
-		}
-
-		if opts.ThinkingEffort != "" {
-			manager.SetThinkingEffort(opts.ThinkingEffort)
-		}
-
-		_, chatErr := manager.Chat(reqCtx, userInput)
-		if chatErr != nil {
-			log.Error("chat error",
-				slog.String("threadId", threadID),
-				slog.String("model", modelAlias),
-				slog.String("error", chatErr.Error()),
-			)
-			// Let ErrMaxToolIterations pass through so the handler can emit an interrupt.
-			if errors.Is(chatErr, domain.ErrMaxToolIterations) {
-				return chatErr
-			}
-			return userFacingError(chatErr)
-		}
-		return nil
-	}
+	chatFn := buildChatFunc(log, cfg, llmRouter, pp, messages, browser, mcpManager)
 
 	mux := http.NewServeMux()
 
@@ -227,25 +170,94 @@ func methodNotAllowed(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 }
 
-// userFacingError returns a sanitized error message suitable for end users.
-// Technical details are logged separately at ERROR level.
-func userFacingError(err error) error {
+// buildChatFunc constructs the ChatFunc that resolves the model, wires the
+// conversation manager, and streams events back via the SSE writer.
+// errors returned by the ChatFunc are sanitized for end users,
+// while technical details are logged at ERROR level.
+// ChatFunc and its relative errors are designed to be used in the AG-UI HTTP handler.
+func buildChatFunc(
+	log *slog.Logger,
+	cfg *config.Config,
+	llmRouter *router.Router,
+	pp domain.PromptProvider,
+	messages *sqlitestore.MessageRepository,
+	browser *sqlitestore.Browser,
+	mcpManager *mcp.Manager,
+) agui.ChatFunc {
+	return func(reqCtx context.Context, threadID string, modelAlias string, aguiMessages []types.Message, opts agui.ChatOptions) error {
+		client, err := llmRouter.Get(modelAlias)
+		if err != nil {
+			log.Error("resolving model", slog.String("model", modelAlias), slog.String("error", err.Error()))
+			return sanitizeError(err)
+		}
+
+		modelDescriptor, err := domain.Lookup(modelAlias)
+		if err != nil {
+			log.Error("looking up model", slog.String("model", modelAlias), slog.String("error", err.Error()))
+			return sanitizeError(err)
+		}
+
+		aguiEmitter := agui.NewAGUIEmitter(opts.SSEWriter, log)
+		handlers := domain.NewMessageEventHandlers([][]domain.MessageEventHandler{
+			{aguiEmitter, messages},
+		})
+
+		scope := domain.NewSessionScope(threadID, "anonymous")
+		manager := domain.NewConversationManager(domain.ConversationManagerConfig{
+			Client:             client,
+			ModelID:            modelAlias,
+			Scope:              scope,
+			Provider:           modelDescriptor.OLTPProvider,
+			Store:              messages,
+			SessionBrowser:     browser,
+			PromptProvider:     pp,
+			Tools:              mcpManager.Tools,
+			EventHandlers:      handlers,
+			MaxConcurrentTools: cfg.ToolsMaxConcurrent,
+			ContextFullTurns:   cfg.ContextFullTurns,
+		})
+
+		userInput := extractUserInput(aguiMessages)
+		if userInput == "" {
+			return fmt.Errorf("no user message found in request")
+		}
+
+		if opts.ThinkingEffort != "" {
+			manager.SetThinkingEffort(opts.ThinkingEffort)
+		}
+
+		_, chatErr := manager.Chat(reqCtx, userInput)
+		if chatErr != nil {
+			log.Error("chat error",
+				slog.String("threadId", threadID),
+				slog.String("model", modelAlias),
+				slog.String("error", chatErr.Error()),
+			)
+			// Let ErrMaxToolIterations pass through so the handler can emit an interrupt.
+			if errors.Is(chatErr, domain.ErrMaxToolIterations) {
+				return chatErr
+			}
+			return sanitizeError(chatErr)
+		}
+		return nil
+	}
+}
+
+// sanitizeError returns a message suitable for end users.
+// The message is sent to the client via the AG-UI SSE stream.
+func sanitizeError(err error) error {
 	switch {
-	case errors.Is(err, context.Canceled):
-		return fmt.Errorf("request was cancelled")
 	case errors.Is(err, context.DeadlineExceeded):
 		return fmt.Errorf("request timed out, please try again")
 	case errors.Is(err, config.ErrMissingEnvVar):
 		return fmt.Errorf("missing environment variable, please contact the administrator")
 	case errors.Is(err, domain.ErrSystemPrompt):
 		return fmt.Errorf("system prompt error, please contact the administrator")
-	case errors.Is(err, domain.ErrMaxToolIterations):
-		return fmt.Errorf("the tool call limit was reached before finalizing. try rephrasing your question more specifically")
 	case errors.As(err, new(*sqlitestore.ErrStore)):
-		return fmt.Errorf("service temporarily unavailable, please try again")
+		return fmt.Errorf("store temporarily unavailable, please try again")
 	case errors.Is(err, mcp.ErrSessionUnavailable):
 		return fmt.Errorf("MCP tool execution is temporarily unavailable for an MCP server, please try again")
 	default:
-		return fmt.Errorf("an unexpected error occurred, please try again")
+		return fmt.Errorf("an unexpected error occurred")
 	}
 }

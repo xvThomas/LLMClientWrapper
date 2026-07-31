@@ -206,7 +206,7 @@ func TestUserFacingError(t *testing.T) {
 		{
 			name: "context canceled",
 			err:  context.Canceled,
-			want: "request was cancelled",
+			want: "an unexpected error occurred",
 		},
 		{
 			name: "deadline exceeded",
@@ -226,12 +226,12 @@ func TestUserFacingError(t *testing.T) {
 		{
 			name: "store error",
 			err:  &sqlitestore.ErrStore{Err: fmt.Errorf("database is locked")},
-			want: "service temporarily unavailable, please try again",
+			want: "store temporarily unavailable, please try again",
 		},
 		{
 			name: "max tool iterations",
 			err:  domain.ErrMaxToolIterations,
-			want: "the tool call limit was reached before finalizing. try rephrasing your question more specifically",
+			want: "an unexpected error occurred",
 		},
 		{
 			name: "mcp session unavailable",
@@ -241,18 +241,18 @@ func TestUserFacingError(t *testing.T) {
 		{
 			name: "wrapped max tool iterations",
 			err:  fmt.Errorf("chat failed: %w", domain.ErrMaxToolIterations),
-			want: "the tool call limit was reached before finalizing. try rephrasing your question more specifically",
+			want: "an unexpected error occurred",
 		},
 		{
 			name: "unknown error",
 			err:  fmt.Errorf("something unexpected happened"),
-			want: "an unexpected error occurred, please try again",
+			want: "an unexpected error occurred",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := userFacingError(tt.err)
+			got := sanitizeError(tt.err)
 			if got.Error() != tt.want {
 				t.Errorf("userFacingError() = %q, want %q", got.Error(), tt.want)
 			}

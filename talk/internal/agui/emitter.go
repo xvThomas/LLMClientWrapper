@@ -34,45 +34,11 @@ func (e *AGUIEmitter) HandleMessageEvent(ctx context.Context, event domain.Messa
 	if event.Role != domain.RoleAssistant {
 		return nil
 	}
-
-	// Emit reasoning events if thinking content is present (independent of tool calls).
 	if event.Thinking != "" {
-		reasoningID := uuid.New().String()
-		if err := e.writeEvent(ctx, events.NewReasoningStartEvent(reasoningID)); err != nil {
-			return nil
-		}
-		if err := e.writeEvent(ctx, events.NewReasoningMessageStartEvent(reasoningID, "reasoning")); err != nil {
-			return nil
-		}
-		if err := e.writeEvent(ctx, events.NewReasoningMessageContentEvent(reasoningID, event.Thinking)); err != nil {
-			return nil
-		}
-		if err := e.writeEvent(ctx, events.NewReasoningMessageEndEvent(reasoningID)); err != nil {
-			return nil
-		}
-		if err := e.writeEvent(ctx, events.NewReasoningEndEvent(reasoningID)); err != nil {
-			return nil
-		}
+		e.emitReasoning(ctx, event.Thinking)
 	}
-
-	// Emit text message events only for final messages (no tool calls, non-empty content).
-	if len(event.ToolCalls) > 0 {
-		return nil
-	}
-	if event.Content == "" {
-		return nil
-	}
-
-	messageID := uuid.New().String()
-
-	if err := e.writeEvent(ctx, events.NewTextMessageStartEvent(messageID, events.WithRole("assistant"))); err != nil {
-		return nil
-	}
-	if err := e.writeEvent(ctx, events.NewTextMessageContentEvent(messageID, event.Content)); err != nil {
-		return nil
-	}
-	if err := e.writeEvent(ctx, events.NewTextMessageEndEvent(messageID)); err != nil {
-		return nil
+	if len(event.ToolCalls) == 0 && event.Content != "" {
+		e.emitTextMessage(ctx, event.Content)
 	}
 	return nil
 }
@@ -84,22 +50,34 @@ func (e *AGUIEmitter) HandleTurnEvent(_ context.Context, _ domain.TurnEvent) err
 
 // HandleToolCallStart emits TOOL_CALL_START and TOOL_CALL_ARGS events before tool execution.
 func (e *AGUIEmitter) HandleToolCallStart(ctx context.Context, event domain.ToolCallEvent) error {
-	if err := e.writeEvent(ctx, events.NewToolCallStartEvent(event.ToolCall.ID, event.ToolCall.Name)); err != nil {
-		return nil
-	}
+	_ = e.writeEvent(ctx, events.NewToolCallStartEvent(event.ToolCall.ID, event.ToolCall.Name))
 	argsJSON, _ := json.Marshal(event.ToolCall.Input)
-	if err := e.writeEvent(ctx, events.NewToolCallArgsEvent(event.ToolCall.ID, string(argsJSON))); err != nil {
-		return nil
-	}
+	_ = e.writeEvent(ctx, events.NewToolCallArgsEvent(event.ToolCall.ID, string(argsJSON)))
 	return nil
 }
 
 // HandleToolCallEnd emits a TOOL_CALL_END event after tool execution completes.
 func (e *AGUIEmitter) HandleToolCallEnd(ctx context.Context, event domain.ToolCallEndEvent) error {
-	if err := e.writeEvent(ctx, events.NewToolCallEndEvent(event.ToolCall.ID)); err != nil {
-		return nil
-	}
+	_ = e.writeEvent(ctx, events.NewToolCallEndEvent(event.ToolCall.ID))
 	return nil
+}
+
+// emitReasoning emits the REASONING_* event sequence for a thinking block.
+func (e *AGUIEmitter) emitReasoning(ctx context.Context, thinking string) {
+	id := uuid.New().String()
+	_ = e.writeEvent(ctx, events.NewReasoningStartEvent(id))
+	_ = e.writeEvent(ctx, events.NewReasoningMessageStartEvent(id, "reasoning"))
+	_ = e.writeEvent(ctx, events.NewReasoningMessageContentEvent(id, thinking))
+	_ = e.writeEvent(ctx, events.NewReasoningMessageEndEvent(id))
+	_ = e.writeEvent(ctx, events.NewReasoningEndEvent(id))
+}
+
+// emitTextMessage emits the TEXT_MESSAGE_* event sequence for a final assistant message.
+func (e *AGUIEmitter) emitTextMessage(ctx context.Context, content string) {
+	id := uuid.New().String()
+	_ = e.writeEvent(ctx, events.NewTextMessageStartEvent(id, events.WithRole("assistant")))
+	_ = e.writeEvent(ctx, events.NewTextMessageContentEvent(id, content))
+	_ = e.writeEvent(ctx, events.NewTextMessageEndEvent(id))
 }
 
 // writeEvent checks for context cancellation, writes the event, and handles errors
