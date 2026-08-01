@@ -7,15 +7,24 @@ COPY .git/ ./.git/
 COPY talk-libs/ ./talk-libs/
 COPY mcp-owm/ ./mcp-owm/
 
+WORKDIR /src/mcp-owm
+
 ENV GOWORK=off
+
 RUN VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev") && \
-    cd mcp-owm && go mod download && \
-    CGO_ENABLED=0 go build -ldflags "-X github.com/xvThomas/talk-backend/talk-libs/version.Version=${VERSION}" -o /bin/mcp-owm ./cmd
+    go mod download && \
+    CGO_ENABLED=0 go build \
+        -ldflags "-X github.com/xvThomas/talk-backend/talk-libs/version.Version=${VERSION}" \
+        -o /bin/mcp-owm \
+        ./cmd
 
 FROM alpine:3.21
 
 RUN apk add --no-cache ca-certificates
+
 COPY --from=builder /bin/mcp-owm /usr/local/bin/mcp-owm
+
+USER appuser
 
 EXPOSE 8080
 
