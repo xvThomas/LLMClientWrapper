@@ -160,38 +160,17 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 		allToolCalls = append(allToolCalls, response.ToolCalls...)
 		callCount++
 
-		// Store the assistant response in the conversation history,
-		// including tool calls as a special message type.
-		storedResponse := *response
-		storedResponse.TurnID = turnID
-		if strings.TrimSpace(storedResponse.Content) == "" && len(storedResponse.ToolCalls) > 0 {
-			storedResponse.Content = formatToolCallSummary(storedResponse.ToolCalls)
-		}
-		if err := m.messageHandler.HandleMessageEvent(ctx, MessageEvent{
-			Message:      storedResponse,
-			SessionScope: m.sessionScope,
-			Model:        model,
-			TurnSpanID:   turnSpanID,
-			Kind:         kind,
-			Usage:        usage,
-			StartedAt:    callStartedAt,
-			EndedAt:      lastCallEndedAt,
-			APICall: APICallEvent{
-				StartedAt: callStartedAt,
-				EndedAt:   lastCallEndedAt,
-				Input:     conversationInput,
-				Output:    formatAPICallOutput(response.Content, response.ToolCalls),
-			},
-		}); err != nil {
+		response.TurnID = turnID
+		if err := m.storeAssistantResponse(ctx, response, model, turnSpanID, kind, usage,
+			callStartedAt, lastCallEndedAt, conversationInput); err != nil {
 			return "", fmt.Errorf("handling assistant message event: %w", err)
 		}
 
 		kind = CallKindToolResult
 
-		// If the model responded with content without tool calls, or if we've reached the maximum
-		// tool call iterations, end the conversation turn.
+		// If the model responded without tool calls, the turn is complete.
 		if len(response.ToolCalls) == 0 {
-			if err := m.messageHandler.HandleTurnEvent(ctx, TurnEvent{
+			return m.finishTurn(ctx, TurnEvent{
 				TurnID:       turnID,
 				TurnSpanID:   turnSpanID,
 				StartedAt:    turnStartedAt,
@@ -203,30 +182,15 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 				Input:        userInput,
 				Output:       response.Content,
 				ToolCalls:    allToolCalls,
-			}); err != nil {
-				return "", fmt.Errorf("handling turn event: %w", err)
-			}
-			return response.Content, nil
+			})
 		}
 
-		// If the model responded with tool calls, execute them and feed the results back
-		// to the model in the next iteration.
 		toolExecutions, err := m.toolExecutor.Execute(ctx, turnID, response.ToolCalls)
 		if err != nil {
 			return "", err
 		}
-		for _, toolExecution := range toolExecutions {
-			if err := m.messageHandler.HandleMessageEvent(ctx, MessageEvent{
-				Message:      toolExecution.Message,
-				SessionScope: m.sessionScope,
-				Model:        model,
-				TurnSpanID:   turnSpanID,
-				Kind:         CallKindToolResult,
-				StartedAt:    toolExecution.StartedAt,
-				EndedAt:      toolExecution.EndedAt,
-			}); err != nil {
-				return "", fmt.Errorf("handling tool result event: %w", err)
-			}
+		if err := m.storeToolResultEvents(ctx, toolExecutions, model, turnSpanID); err != nil {
+			return "", err
 		}
 	}
 
@@ -249,6 +213,67 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 	}
 
 	return "", ErrMaxToolIterations
+}
+
+// storeAssistantResponse stores the assistant message in the conversation history.
+// When the model responds with only tool calls (empty text content), it substitutes
+// the content with a human-readable tool-call summary for observability.
+func (m *ConversationManager) storeAssistantResponse(
+	ctx context.Context,
+	response *Message,
+	model Model,
+	turnSpanID string,
+	kind CallKind,
+	usage Usage,
+	callStartedAt, callEndedAt time.Time,
+	conversationInput string,
+) error {
+	stored := *response
+	if strings.TrimSpace(stored.Content) == "" && len(stored.ToolCalls) > 0 {
+		stored.Content = formatToolCallSummary(stored.ToolCalls)
+	}
+	return m.messageHandler.HandleMessageEvent(ctx, MessageEvent{
+		Message:      stored,
+		SessionScope: m.sessionScope,
+		Model:        model,
+		TurnSpanID:   turnSpanID,
+		Kind:         kind,
+		Usage:        usage,
+		StartedAt:    callStartedAt,
+		EndedAt:      callEndedAt,
+		APICall: APICallEvent{
+			StartedAt: callStartedAt,
+			EndedAt:   callEndedAt,
+			Input:     conversationInput,
+			Output:    formatAPICallOutput(response.Content, response.ToolCalls),
+		},
+	})
+}
+
+// storeToolResultEvents stores one message event per tool execution in the conversation history.
+func (m *ConversationManager) storeToolResultEvents(ctx context.Context, executions []ToolExecutionResult, model Model, turnSpanID string) error {
+	for _, exec := range executions {
+		if err := m.messageHandler.HandleMessageEvent(ctx, MessageEvent{
+			Message:      exec.Message,
+			SessionScope: m.sessionScope,
+			Model:        model,
+			TurnSpanID:   turnSpanID,
+			Kind:         CallKindToolResult,
+			StartedAt:    exec.StartedAt,
+			EndedAt:      exec.EndedAt,
+		}); err != nil {
+			return fmt.Errorf("handling tool result event: %w", err)
+		}
+	}
+	return nil
+}
+
+// finishTurn emits the final turn event and returns the assistant's response content.
+func (m *ConversationManager) finishTurn(ctx context.Context, event TurnEvent) (string, error) {
+	if err := m.messageHandler.HandleTurnEvent(ctx, event); err != nil {
+		return "", fmt.Errorf("handling turn event: %w", err)
+	}
+	return event.Output, nil
 }
 
 // formatMessagesAsInput formats the conversation messages as a readable input string for observability

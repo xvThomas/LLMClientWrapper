@@ -181,44 +181,44 @@ func (h *MessageEventHandlers) runPhases(call func(handler MessageEventHandler) 
 	if h == nil || len(h.phases) == 0 {
 		return nil
 	}
-
 	for _, phase := range h.phases {
-		if len(phase) == 0 {
-			continue
-		}
-
-		var (
-			mu  sync.Mutex
-			err error
-			wg  sync.WaitGroup
-		)
-
-		for _, handler := range phase {
-			h := handler
-			wg.Go(func() {
-				defer func() {
-					if recover() != nil {
-						mu.Lock()
-						err = errors.Join(err, errors.New("message event handler panic"))
-						mu.Unlock()
-					}
-				}()
-
-				if callErr := call(h); callErr != nil {
-					mu.Lock()
-					err = errors.Join(err, callErr)
-					mu.Unlock()
-				}
-			})
-		}
-
-		wg.Wait()
-		if err != nil {
+		if err := h.runPhase(phase, call); err != nil {
 			return err
 		}
 	}
-
 	return nil
+}
+
+// runPhase executes call against all handlers in a single phase concurrently.
+// Panics in handlers are recovered and converted to errors.
+func (h *MessageEventHandlers) runPhase(phase []MessageEventHandler, call func(MessageEventHandler) error) error {
+	if len(phase) == 0 {
+		return nil
+	}
+	var (
+		mu  sync.Mutex
+		err error
+		wg  sync.WaitGroup
+	)
+	for _, handler := range phase {
+		hdl := handler
+		wg.Go(func() {
+			defer func() {
+				if recover() != nil {
+					mu.Lock()
+					err = errors.Join(err, errors.New("message event handler panic"))
+					mu.Unlock()
+				}
+			}()
+			if callErr := call(hdl); callErr != nil {
+				mu.Lock()
+				err = errors.Join(err, callErr)
+				mu.Unlock()
+			}
+		})
+	}
+	wg.Wait()
+	return err
 }
 
 // NoOpMessageEventHandler silently discards all events.
