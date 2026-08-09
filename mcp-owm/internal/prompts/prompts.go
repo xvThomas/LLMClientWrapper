@@ -2,6 +2,8 @@ package prompts
 
 import "github.com/xvThomas/talk-backend/talk-libs/mcpserver"
 
+const presentResultAs = "Present the result as: "
+
 // CurrentWeather instructs the LLM to provide a structured weather briefing.
 var CurrentWeather = mcpserver.Prompt{
 	Name:        "current_weather",
@@ -14,7 +16,7 @@ var CurrentWeather = mcpserver.Prompt{
 			Role: "user",
 			Text: "Give me the current weather for {{city}}. " +
 				"First use geocode_city to get the coordinates, then call get_current_weather. " +
-				"Present the result as: " +
+				presentResultAs +
 				"1) Current conditions (temperature, feels like, humidity) " +
 				"2) Wind (speed, direction, gusts) " +
 				"3) Visibility and cloud cover " +
@@ -35,7 +37,7 @@ var CurrentAir = mcpserver.Prompt{
 			Role: "user",
 			Text: "Give me the current air quality for {{city}}. " +
 				"First use geocode_city to get the coordinates, then call get_current_air_pollution. " +
-				"Present the result as: " +
+				"Gives output the result as: " +
 				"1) Overall Air Quality Index with human-readable label (Good/Fair/Moderate/Poor/Very Poor) " +
 				"2) Key pollutants (PM2.5, PM10, O3, NO2) with their concentrations " +
 				"3) Health recommendations based on the AQI level.",
@@ -55,7 +57,7 @@ var ForecastWeather = mcpserver.Prompt{
 			Role: "user",
 			Text: "Give me the weather forecast for {{city}} over the next few days. " +
 				"First use geocode_city to get the coordinates, then call get_weather_forecast. " +
-				"Present the result as: " +
+				presentResultAs +
 				"1) A day-by-day summary with high/low temperatures and general conditions " +
 				"2) Notable weather events (rain, storms, snow) with timing " +
 				"3) Wind trends " +
@@ -76,7 +78,7 @@ var ForecastAir = mcpserver.Prompt{
 			Role: "user",
 			Text: "Give me the air quality forecast for {{city}} over the next few days. " +
 				"First use geocode_city to get the coordinates, then call get_air_pollution_forecast. " +
-				"Present the result as: " +
+				presentResultAs +
 				"1) A day-by-day AQI trend with human-readable labels (Good/Fair/Moderate/Poor/Very Poor) " +
 				"2) Key pollutants evolution (PM2.5, O3) over the period " +
 				"3) Best and worst periods for outdoor activities " +
