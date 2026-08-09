@@ -29,7 +29,7 @@ func (a *App) cmdSession(ctx context.Context, args string) {
 	}
 }
 
-func (a *App) cmdSessionNew(ctx context.Context) {
+func (a *App) cmdSessionNew(_ context.Context) {
 	newID := domain.GenerateSessionID()
 	a.Scope = domain.NewSessionScope(newID, a.Scope.UserID())
 	if a.Manager != nil {
