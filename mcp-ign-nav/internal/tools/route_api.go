@@ -44,46 +44,7 @@ func (c *routeClient) callRouteAPI(ctx context.Context, params routeParams) (*ro
 		return nil, fmt.Errorf("parameter 'end' is required")
 	}
 
-	resource := params.Resource
-	if resource == "" {
-		resource = "bdtopo-osrm"
-	}
-	profile := params.Profile
-	if profile == "" {
-		profile = "car"
-	}
-	optimization := params.Optimization
-	if optimization == "" {
-		optimization = "fastest"
-	}
-
-	body := routeRequest{
-		Start:        params.Start,
-		End:          params.End,
-		Resource:     resource,
-		Profile:      profile,
-		Optimization: optimization,
-	}
-	if params.GetSteps {
-		body.GetSteps = "true"
-		body.GetBbox = "true"
-		body.GeometryFormat = "geojson"
-	}
-	if params.GetGeometry {
-		body.GetGeometry = "true"
-		body.GeometryFormat = "geojson"
-	}
-	if len(params.Intermediates) > 0 {
-		body.Intermediates = params.Intermediates
-	}
-	if params.AvoidHighways == "true" {
-		body.Constraints = []routeConstraint{{
-			ConstraintType: "banned",
-			Key:            "wayType",
-			Operator:       "=",
-			Value:          "autoroute",
-		}}
-	}
+	body := buildRouteRequest(params)
 
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -122,6 +83,50 @@ func (c *routeClient) callRouteAPI(ctx context.Context, params routeParams) (*ro
 	}
 
 	return &result, nil
+}
+
+// buildRouteRequest applies defaults and assembles the JSON body for the IGN /itineraire endpoint.
+func buildRouteRequest(params routeParams) routeRequest {
+	resource := params.Resource
+	if resource == "" {
+		resource = "bdtopo-osrm"
+	}
+	profile := params.Profile
+	if profile == "" {
+		profile = "car"
+	}
+	optimization := params.Optimization
+	if optimization == "" {
+		optimization = "fastest"
+	}
+	body := routeRequest{
+		Start:        params.Start,
+		End:          params.End,
+		Resource:     resource,
+		Profile:      profile,
+		Optimization: optimization,
+	}
+	if params.GetSteps {
+		body.GetSteps = "true"
+		body.GetBbox = "true"
+		body.GeometryFormat = "geojson"
+	}
+	if params.GetGeometry {
+		body.GetGeometry = "true"
+		body.GeometryFormat = "geojson"
+	}
+	if len(params.Intermediates) > 0 {
+		body.Intermediates = params.Intermediates
+	}
+	if params.AvoidHighways == "true" {
+		body.Constraints = []routeConstraint{{
+			ConstraintType: "banned",
+			Key:            "wayType",
+			Operator:       "=",
+			Value:          "autoroute",
+		}}
+	}
+	return body
 }
 
 // routeConstraint represents a routing constraint for the IGN API.

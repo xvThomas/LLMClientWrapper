@@ -94,33 +94,9 @@ func run(ctx context.Context, modelAlias, systemFile string, pprofEnabled bool) 
 	mcpManager.ConnectAll(ctx)
 	defer mcpManager.Close()
 
-	// Create message event handlers based on configuration.
-	var reporters []domain.MessageEventHandler
-
-	// Console reporter if enabled (default: true for backward compatibility)
-	if cfg.ConsoleUsageReporter {
-		reporters = append(reporters, &usage.ConsoleUsageReporter{})
-	}
-
-	// Langfuse reporter if both keys are present
-	if cfg.LangfuseSecretKey != "" && cfg.LangfusePublicKey != "" {
-		langfuseConfig := usage.LangfuseConfig{
-			PublicKey: cfg.LangfusePublicKey,
-			SecretKey: cfg.LangfuseSecretKey,
-			BaseURL:   cfg.LangfuseBaseURL,
-		}
-		langfuseReporter := usage.NewLangfuseUsageReporter(langfuseConfig)
-		reporters = append(reporters, langfuseReporter)
-	}
-
-	// Ensure at least one reporter is active
-	if len(reporters) == 0 {
-		reporters = append(reporters, &usage.ConsoleUsageReporter{})
-	}
-
 	handlers := domain.NewMessageEventHandlers([][]domain.MessageEventHandler{
 		{messages},
-		reporters,
+		buildReporters(cfg),
 	})
 
 	manager := domain.NewConversationManager(domain.ConversationManagerConfig{
@@ -156,11 +132,33 @@ func run(ctx context.Context, modelAlias, systemFile string, pprofEnabled bool) 
 		LR:           lr,
 	}
 
-	app.Printf("%s%s\n", cyan(bold+"Session started."+reset), faint(" "+version.Version))
-	app.cmdHelp()
+	return app.runSession(ctx)
+}
+
+func buildReporters(cfg *config.Config) []domain.MessageEventHandler {
+	var reporters []domain.MessageEventHandler
+	if cfg.ConsoleUsageReporter {
+		reporters = append(reporters, &usage.ConsoleUsageReporter{})
+	}
+	if cfg.LangfuseSecretKey != "" && cfg.LangfusePublicKey != "" {
+		reporters = append(reporters, usage.NewLangfuseUsageReporter(usage.LangfuseConfig{
+			PublicKey: cfg.LangfusePublicKey,
+			SecretKey: cfg.LangfuseSecretKey,
+			BaseURL:   cfg.LangfuseBaseURL,
+		}))
+	}
+	if len(reporters) == 0 {
+		reporters = append(reporters, &usage.ConsoleUsageReporter{})
+	}
+	return reporters
+}
+
+func (a *App) runSession(ctx context.Context) error {
+	a.Printf("%s%s\n", cyan(bold+"Session started."+reset), faint(" "+version.Version))
+	a.cmdHelp()
 	for {
-		app.Println()
-		input, err := lr.ReadLine(green(bold+"You"+reset+":") + " ")
+		a.Println()
+		input, err := a.LR.ReadLine(green(bold+"You"+reset+":") + " ")
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
@@ -174,20 +172,20 @@ func run(ctx context.Context, modelAlias, systemFile string, pprofEnabled bool) 
 		}
 
 		if strings.HasPrefix(input, "/") {
-			app.handleSlashCommand(ctx, input)
+			a.handleSlashCommand(ctx, input)
 			continue
 		}
 
-		answer, err := manager.Chat(ctx, input)
+		answer, err := a.Manager.Chat(ctx, input)
 		if err != nil {
-			app.Printf("\n%s %s\n", red("Error:"), err.Error())
+			a.Printf("\n%s %s\n", red("Error:"), err.Error())
 			continue
 		}
 
-		app.Printf("\n%s %s\n", cyan(bold+"Assistant"+reset+":"), answer)
+		a.Printf("\n%s %s\n", cyan(bold+"Assistant"+reset+":"), answer)
 	}
 
-	app.Println("\n" + faint("Session ended."))
+	a.Println("\n" + faint("Session ended."))
 	return nil
 }
 

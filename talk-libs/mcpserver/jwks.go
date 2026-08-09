@@ -76,44 +76,54 @@ func NewJWKSTokenVerifier(cfg JWKSVerifierConfig) auth.TokenVerifier {
 		parserOpts = append(parserOpts, jwt.WithAudience(cfg.Audience))
 	}
 
-	parser := jwt.NewParser(parserOpts...)
+	v := &jwksVerifier{
+		cache:  cache,
+		parser: jwt.NewParser(parserOpts...),
+	}
+	return v.verify
+}
 
-	return func(ctx context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
-		keyFunc := func(t *jwt.Token) (any, error) {
-			kid, ok := t.Header["kid"].(string)
-			if !ok {
-				return nil, fmt.Errorf("%w: missing kid header", auth.ErrInvalidToken)
-			}
-			key, err := cache.getKey(ctx, kid)
-			if err != nil {
-				return nil, fmt.Errorf("%w: %v", auth.ErrInvalidToken, err)
-			}
-			return key, nil
+// jwksVerifier holds the JWKS cache and JWT parser used to verify tokens.
+type jwksVerifier struct {
+	cache  *jwksCache
+	parser *jwt.Parser
+}
+
+func (v *jwksVerifier) verify(ctx context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
+	keyFunc := func(t *jwt.Token) (any, error) {
+		kid, ok := t.Header["kid"].(string)
+		if !ok {
+			return nil, fmt.Errorf("%w: missing kid header", auth.ErrInvalidToken)
 		}
-
-		var claims tokenClaims
-		parsed, err := parser.ParseWithClaims(token, &claims, keyFunc)
+		key, err := v.cache.getKey(ctx, kid)
 		if err != nil {
-			slog.Debug("jwks verifier: token parse failed", "error", err, "token", token)
 			return nil, fmt.Errorf("%w: %v", auth.ErrInvalidToken, err)
 		}
-		if !parsed.Valid {
-			slog.Debug("jwks verifier: token not valid after parsing", "token", token)
-			return nil, fmt.Errorf("%w: token is not valid", auth.ErrInvalidToken)
-		}
-
-		slog.Debug("jwks verifier: token verified", "sub", claims.Subject, "iss", claims.Issuer, "aud", claims.Audience, "scope", claims.Scope)
-		info := &auth.TokenInfo{
-			UserID: claims.Subject,
-		}
-		if claims.ExpiresAt != nil {
-			info.Expiration = claims.ExpiresAt.Time
-		}
-		if claims.Scope != "" {
-			info.Scopes = strings.Split(claims.Scope, " ")
-		}
-		return info, nil
+		return key, nil
 	}
+
+	var claims tokenClaims
+	parsed, err := v.parser.ParseWithClaims(token, &claims, keyFunc)
+	if err != nil {
+		slog.Debug("jwks verifier: token parse failed", "error", err, "token", token)
+		return nil, fmt.Errorf("%w: %v", auth.ErrInvalidToken, err)
+	}
+	if !parsed.Valid {
+		slog.Debug("jwks verifier: token not valid after parsing", "token", token)
+		return nil, fmt.Errorf("%w: token is not valid", auth.ErrInvalidToken)
+	}
+
+	slog.Debug("jwks verifier: token verified", "sub", claims.Subject, "iss", claims.Issuer, "aud", claims.Audience, "scope", claims.Scope)
+	info := &auth.TokenInfo{
+		UserID: claims.Subject,
+	}
+	if claims.ExpiresAt != nil {
+		info.Expiration = claims.ExpiresAt.Time
+	}
+	if claims.Scope != "" {
+		info.Scopes = strings.Split(claims.Scope, " ")
+	}
+	return info, nil
 }
 
 // tokenClaims extends RegisteredClaims with the OAuth "scope" claim.

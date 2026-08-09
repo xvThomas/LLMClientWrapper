@@ -118,32 +118,7 @@ func (t *RouteTool) Call(ctx context.Context, input RouteToolInput) (RouteToolOu
 	for _, p := range result.Portions {
 		steps := make([]RouteStep, 0, len(p.Steps))
 		for _, s := range p.Steps {
-			name := s.Attributes.Name.NomGauche
-			if name == "" {
-				name = s.Attributes.Name.NomDroite
-			}
-			var stepStart, stepEnd string
-			if s.Geometry != nil && len(s.Geometry.Coordinates) > 0 {
-				first := s.Geometry.Coordinates[0]
-				if len(first) >= 2 {
-					stepStart = fmt.Sprintf("%g,%g", first[0], first[1])
-				}
-				last := s.Geometry.Coordinates[len(s.Geometry.Coordinates)-1]
-				if len(last) >= 2 {
-					stepEnd = fmt.Sprintf("%g,%g", last[0], last[1])
-				}
-			}
-			steps = append(steps, RouteStep{
-				Start:       stepStart,
-				End:         stepEnd,
-				Distance:    s.Distance,
-				Duration:    s.Duration,
-				Instruction: s.Instruction.Type,
-				Modifier:    s.Instruction.Modifier,
-				Name:        name,
-				RoadNumber:  s.Attributes.Name.CpxNumero,
-				Toponyme:    s.Attributes.Name.CpxToponyme,
-			})
+			steps = append(steps, convertRouteStep(s))
 		}
 		portions = append(portions, RoutePortion{
 			Start:    p.Start,
@@ -175,4 +150,32 @@ func (t *RouteTool) Call(ctx context.Context, input RouteToolInput) (RouteToolOu
 		Geometry:     geometry,
 		Portions:     portions,
 	}, nil
+}
+
+// convertRouteStep converts a single routeAPIStep to a RouteStep.
+func convertRouteStep(s routeAPIStep) RouteStep {
+	name := s.Attributes.Name.NomGauche
+	if name == "" {
+		name = s.Attributes.Name.NomDroite
+	}
+	var stepStart, stepEnd string
+	if s.Geometry != nil && len(s.Geometry.Coordinates) > 0 {
+		if first := s.Geometry.Coordinates[0]; len(first) >= 2 {
+			stepStart = fmt.Sprintf("%g,%g", first[0], first[1])
+		}
+		if last := s.Geometry.Coordinates[len(s.Geometry.Coordinates)-1]; len(last) >= 2 {
+			stepEnd = fmt.Sprintf("%g,%g", last[0], last[1])
+		}
+	}
+	return RouteStep{
+		Start:       stepStart,
+		End:         stepEnd,
+		Distance:    s.Distance,
+		Duration:    s.Duration,
+		Instruction: s.Instruction.Type,
+		Modifier:    s.Instruction.Modifier,
+		Name:        name,
+		RoadNumber:  s.Attributes.Name.CpxNumero,
+		Toponyme:    s.Attributes.Name.CpxToponyme,
+	}
 }

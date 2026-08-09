@@ -82,35 +82,7 @@ func (t *GeocodingTool) Call(ctx context.Context, input GeocodingToolInput) (Geo
 		return GeocodingToolOutput{}, fmt.Errorf("parameter 'q' (search query) is required")
 	}
 
-	index := input.Index
-	if index == "" {
-		index = defaultIndex
-	}
-
-	limit := input.Limit
-	if limit <= 0 {
-		limit = defaultSearchLimit
-	}
-
-	params := url.Values{}
-	params.Set("q", input.Query)
-	params.Set("index", index)
-	params.Set("limit", strconv.Itoa(limit))
-	params.Set("autocomplete", "0")
-
-	if input.Postcode != "" {
-		params.Set("postcode", input.Postcode)
-	}
-	if input.CityCode != "" {
-		params.Set("citycode", input.CityCode)
-	}
-	if input.Type != "" {
-		params.Set("type", input.Type)
-	}
-	if input.Lon != 0 || input.Lat != 0 {
-		params.Set("lon", strconv.FormatFloat(input.Lon, 'f', -1, 64))
-		params.Set("lat", strconv.FormatFloat(input.Lat, 'f', -1, 64))
-	}
+	params := buildSearchParams(input)
 
 	endpoint := fmt.Sprintf("%s/search?%s", t.baseURL, params.Encode())
 
@@ -160,6 +132,37 @@ func (t *GeocodingTool) Call(ctx context.Context, input GeocodingToolInput) (Geo
 	}
 
 	return GeocodingToolOutput{Results: results}, nil
+}
+
+// buildSearchParams assembles the URL query parameters for the IGN /search endpoint.
+func buildSearchParams(input GeocodingToolInput) url.Values {
+	index := input.Index
+	if index == "" {
+		index = defaultIndex
+	}
+	limit := input.Limit
+	if limit <= 0 {
+		limit = defaultSearchLimit
+	}
+	params := url.Values{}
+	params.Set("q", input.Query)
+	params.Set("index", index)
+	params.Set("limit", strconv.Itoa(limit))
+	params.Set("autocomplete", "0")
+	if input.Postcode != "" {
+		params.Set("postcode", input.Postcode)
+	}
+	if input.CityCode != "" {
+		params.Set("citycode", input.CityCode)
+	}
+	if input.Type != "" {
+		params.Set("type", input.Type)
+	}
+	if input.Lon != 0 || input.Lat != 0 {
+		params.Set("lon", strconv.FormatFloat(input.Lon, 'f', -1, 64))
+		params.Set("lat", strconv.FormatFloat(input.Lat, 'f', -1, 64))
+	}
+	return params
 }
 
 // searchFeatureCollection represents the GeoJSON FeatureCollection returned by the /search endpoint.

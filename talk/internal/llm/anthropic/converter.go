@@ -17,24 +17,8 @@ func toSDKMessages(messages []domain.Message) []anthropic.MessageParam {
 	// Single-pass: build and merge consecutive same-role messages in one allocation.
 	result := make([]anthropic.MessageParam, 0, len(messages))
 	for _, msg := range messages {
-		var p anthropic.MessageParam
-		switch msg.Role {
-		case domain.RoleUser:
-			if msg.Content == "" {
-				continue
-			}
-			p = anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content))
-		case domain.RoleAssistant:
-			p = toAssistantParam(msg)
-			if len(p.Content) == 0 {
-				continue
-			}
-		case domain.RoleTool:
-			if len(msg.ToolResults) == 0 {
-				continue
-			}
-			p = toToolResultParam(msg)
-		default:
+		p, ok := toSDKMessage(msg)
+		if !ok {
 			continue
 		}
 		// Anthropic requires strict user/assistant alternation.
@@ -46,6 +30,31 @@ func toSDKMessages(messages []domain.Message) []anthropic.MessageParam {
 		}
 	}
 	return result
+}
+
+// toSDKMessage converts a single domain message to an Anthropic SDK message param.
+// Returns (zero, false) for messages that should be skipped.
+func toSDKMessage(msg domain.Message) (anthropic.MessageParam, bool) {
+	switch msg.Role {
+	case domain.RoleUser:
+		if msg.Content == "" {
+			return anthropic.MessageParam{}, false
+		}
+		return anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content)), true
+	case domain.RoleAssistant:
+		p := toAssistantParam(msg)
+		if len(p.Content) == 0 {
+			return anthropic.MessageParam{}, false
+		}
+		return p, true
+	case domain.RoleTool:
+		if len(msg.ToolResults) == 0 {
+			return anthropic.MessageParam{}, false
+		}
+		return toToolResultParam(msg), true
+	default:
+		return anthropic.MessageParam{}, false
+	}
 }
 
 func toAssistantParam(msg domain.Message) anthropic.MessageParam {

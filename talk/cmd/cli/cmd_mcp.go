@@ -95,33 +95,7 @@ func (a *App) cmdMCPAdd(ctx context.Context) {
 		AuthType: mcp.AuthType(authChoice),
 	}
 
-	switch cfg.AuthType {
-	case mcp.AuthTypeNone:
-		// No credentials needed.
-	case mcp.AuthTypeAPIKey:
-		key, err := a.LR.ReadLine("API Key: ")
-		if err != nil {
-			a.Println(yellow(cancelled))
-			return
-		}
-		cfg.APIKey = strings.TrimSpace(key)
-	case mcp.AuthTypeOAuth:
-		clientID, _ := a.LR.ReadLine("Client ID: ")
-		clientSecret, _ := a.LR.ReadLine("Client Secret: ")
-		tokenURL, _ := a.LR.ReadLine("Token URL: ")
-		scopes, _ := a.LR.ReadLine("Scopes (comma-separated): ")
-		cfg.OAuth = &mcp.OAuthConfig{
-			ClientID:     strings.TrimSpace(clientID),
-			ClientSecret: strings.TrimSpace(clientSecret),
-			TokenURL:     strings.TrimSpace(tokenURL),
-		}
-		if s := strings.TrimSpace(scopes); s != "" {
-			for _, sc := range strings.Split(s, ",") {
-				cfg.OAuth.Scopes = append(cfg.OAuth.Scopes, strings.TrimSpace(sc))
-			}
-		}
-	default:
-		a.Printf("%s\n", yellow("Invalid auth type. Use 'none', 'apikey', or 'oauth'."))
+	if !a.buildMCPAuthConfig(&cfg) {
 		return
 	}
 
@@ -144,6 +118,41 @@ func (a *App) cmdMCPAdd(ctx context.Context) {
 		a.Printf(" %s", faint("("+status.ServerName+" "+status.ServerVersion+")"))
 	}
 	a.Printf(" — %d tools\n", len(status.Tools))
+}
+
+// buildMCPAuthConfig prompts for credentials and fills cfg accordingly.
+// Returns false if the user cancels or selects an invalid auth type.
+func (a *App) buildMCPAuthConfig(cfg *mcp.ServerConfig) bool {
+	switch cfg.AuthType {
+	case mcp.AuthTypeNone:
+		// No credentials needed.
+	case mcp.AuthTypeAPIKey:
+		key, err := a.LR.ReadLine("API Key: ")
+		if err != nil {
+			a.Println(yellow(cancelled))
+			return false
+		}
+		cfg.APIKey = strings.TrimSpace(key)
+	case mcp.AuthTypeOAuth:
+		clientID, _ := a.LR.ReadLine("Client ID: ")
+		clientSecret, _ := a.LR.ReadLine("Client Secret: ")
+		tokenURL, _ := a.LR.ReadLine("Token URL: ")
+		scopes, _ := a.LR.ReadLine("Scopes (comma-separated): ")
+		cfg.OAuth = &mcp.OAuthConfig{
+			ClientID:     strings.TrimSpace(clientID),
+			ClientSecret: strings.TrimSpace(clientSecret),
+			TokenURL:     strings.TrimSpace(tokenURL),
+		}
+		if s := strings.TrimSpace(scopes); s != "" {
+			for _, sc := range strings.Split(s, ",") {
+				cfg.OAuth.Scopes = append(cfg.OAuth.Scopes, strings.TrimSpace(sc))
+			}
+		}
+	default:
+		a.Printf("%s\n", yellow("Invalid auth type. Use 'none', 'apikey', or 'oauth'."))
+		return false
+	}
+	return true
 }
 
 func (a *App) cmdMCPRemove(ctx context.Context) {
