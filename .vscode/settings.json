@@ -42,9 +42,5 @@
     "coveredGutterStyle": "blockblue",
     "type": "gutter",
     "uncoveredGutterStyle": "blockred"
-  },
-  "sonarlint.connectedMode.project": {
-    "connectionId": "xvthomas",
-    "projectKey": "xvThomas_talk-backend"
   }
 }
