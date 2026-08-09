@@ -52,7 +52,7 @@ func TestLangfuseUsageReporter_HandleMessageEvent_NonAssistantNoBuffer(t *testin
 func TestLangfuseUsageReporter_HandleMessageEvent_AssistantBuffered(t *testing.T) {
 	r := &LangfuseUsageReporter{
 		eventBuffer: make(chan traceEvent, 1),
-		ctx:         context.Background(),
+		done:        context.Background().Done(),
 	}
 
 	msg := domain.MessageEvent{
@@ -71,7 +71,7 @@ func TestLangfuseUsageReporter_HandleMessageEvent_AssistantBuffered(t *testing.T
 func TestLangfuseUsageReporter_HandleTurnEvent_BufferFullDrops(t *testing.T) {
 	r := &LangfuseUsageReporter{
 		eventBuffer: make(chan traceEvent, 1),
-		ctx:         context.Background(),
+		done:        context.Background().Done(),
 	}
 
 	// Fill buffer first.

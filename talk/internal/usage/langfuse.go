@@ -24,7 +24,7 @@ type LangfuseUsageReporter struct {
 	eventBuffer chan traceEvent
 	wg          sync.WaitGroup
 	cancel      context.CancelFunc
-	ctx         context.Context
+	done        <-chan struct{}
 }
 
 // traceEvent represents an event to be sent to Langfuse
@@ -65,7 +65,7 @@ func NewLangfuseUsageReporter(config LangfuseConfig) *LangfuseUsageReporter {
 		authHeader:  authHeader,
 		eventBuffer: make(chan traceEvent, 1000), // Buffer up to 1000 events
 		cancel:      cancel,
-		ctx:         ctx,
+		done:        ctx.Done(),
 	}
 
 	// Start background worker
@@ -83,7 +83,7 @@ func (l *LangfuseUsageReporter) HandleMessageEvent(_ context.Context, messageEve
 
 	select {
 	case l.eventBuffer <- traceEvent{eventType: "message_event", data: messageEvent}:
-	case <-l.ctx.Done():
+	case <-l.done:
 		return nil
 	default:
 		// Buffer full, drop event to prevent blocking
@@ -97,7 +97,7 @@ func (l *LangfuseUsageReporter) HandleMessageEvent(_ context.Context, messageEve
 func (l *LangfuseUsageReporter) HandleTurnEvent(_ context.Context, event domain.TurnEvent) error {
 	select {
 	case l.eventBuffer <- traceEvent{eventType: "turn_event", data: event}:
-	case <-l.ctx.Done():
+	case <-l.done:
 		return nil
 	default:
 		// Buffer full, drop event to prevent blocking
