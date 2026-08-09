@@ -83,7 +83,7 @@ type ipRateLimiter struct {
 
 // newIPRateLimiter creates a per-IP rate limiter. It starts a background
 // goroutine that removes entries inactive for longer than ttl.
-func newIPRateLimiter(rps int, burst int) *ipRateLimiter {
+func newIPRateLimiter(rps, burst int) *ipRateLimiter {
 	l := &ipRateLimiter{
 		entries: make(map[string]*ipEntry),
 		rps:     rate.Limit(rps),
