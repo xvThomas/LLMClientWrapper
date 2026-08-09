@@ -27,7 +27,7 @@ build: ## Build the CLI binary
 	@$(ECHO) "$(COLOR_GREEN)$(CHECK) Build successful: $(BINARY)$(COLOR_RESET)"
 
 run: ## Run the CLI (MODEL=haiku-4.5)
-	go run $(LDFLAGS) $(CMD) --model $(or $(MODEL),haiku-4.5) --system-file $(or $(SYSTEM_FILE),./system_prompt.md)
+	go run -tags debug $(LDFLAGS) $(CMD) --model $(or $(MODEL),haiku-4.5) --system-file $(or $(SYSTEM_FILE),./system_prompt.md)
 
 serve: build ## Start the AG-UI server (MODEL=haiku-4.5, PORT=8090)
 	cp -f system_prompt.md bin/system_prompt.md
@@ -41,7 +41,7 @@ serve-dev: ## Start the AG-UI server with hot reload (requires air)
 _air-build:
 	mkdir -p tmp
 	cp -f system_prompt.md tmp/system_prompt.md
-	go build $(LDFLAGS) -o ./tmp/talk-cli.exe $(CMD)
+	go build -tags debug $(LDFLAGS) -o ./tmp/talk-cli.exe $(CMD)
 
 test: ## Run tests
 	@$(ECHO) "$(COLOR_YELLOW)Running tests...$(COLOR_RESET)"
