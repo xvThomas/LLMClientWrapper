@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	fmtErrLine  = "%s%s\n"
-	errPrefix   = "Error: "
+	fmtErrLine    = "%s%s\n"
+	errPrefix     = "Error: "
 	labelUntitled = "(untitled)"
 )
 
