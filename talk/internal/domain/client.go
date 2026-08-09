@@ -18,7 +18,8 @@ type CompletionOptions struct {
 }
 
 // LlmClient is the unified interface for any LLM backend.
-type LlmClient interface {
+// Intentionally named LlmClient (not Completer) as additional methods are expected.
+type LlmClient interface { // NOSONAR
 	// Complete sends the conversation to the model and returns the next message
 	// together with the token usage for this API call.
 	// systemPrompt is passed separately because some providers (Anthropic) treat
