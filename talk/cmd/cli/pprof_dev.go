@@ -1,10 +1,12 @@
 //go:build debug
 
+//go:generate go run -tags=debug
+
 package main
 
 import (
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //NOSONAR go:S4507
 
 	"github.com/spf13/cobra"
 )

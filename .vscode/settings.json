@@ -35,6 +35,9 @@
   },
   "github.copilot.chat.codeGeneration.useInstructionFiles": true,
   "go.coverOnSave": true,
+  "gopls": {
+    "buildFlags": ["-tags=debug"]
+  },
   "go.coverageDecorator": {
     "coveredGutterStyle": "blockblue",
     "type": "gutter",
