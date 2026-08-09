@@ -11,7 +11,7 @@ import (
 
 	"github.com/xvThomas/talk-backend/talk/internal/domain"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // registers the SQLite driver with database/sql
 )
 
 const timeFormat = "2006-01-02T15:04:05Z"
