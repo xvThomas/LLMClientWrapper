@@ -84,18 +84,9 @@ func (r *SQLiteRegistry) List(_ context.Context) ([]ServerConfig, error) {
 
 	var configs []ServerConfig
 	for rows.Next() {
-		var cfg ServerConfig
-		var authType, oauthJSON string
-		if err := rows.Scan(&cfg.ID, &cfg.Name, &cfg.URL, &authType, &cfg.APIKey, &oauthJSON); err != nil {
-			return nil, fmt.Errorf("scanning mcp server row: %w", err)
-		}
-		cfg.AuthType = AuthType(authType)
-		if oauthJSON != "" {
-			var oc OAuthConfig
-			if err := json.Unmarshal([]byte(oauthJSON), &oc); err != nil {
-				return nil, fmt.Errorf("unmarshalling oauth config for %q: %w", cfg.Name, err)
-			}
-			cfg.OAuth = &oc
+		cfg, err := scanServerConfig(rows)
+		if err != nil {
+			return nil, err
 		}
 		configs = append(configs, cfg)
 	}

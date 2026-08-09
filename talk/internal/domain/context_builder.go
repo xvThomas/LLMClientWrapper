@@ -131,7 +131,7 @@ func lastNTurnIDs(messages []Message, currentTurnID string, n int) []string {
 	ordered := make([]string, 0)
 	seen := make(map[string]struct{})
 	for _, msg := range messages {
-		if msg.Role != RoleUser || msg.TurnID == "" || msg.TurnID == currentTurnID {
+		if !isPreviousUserTurn(msg, currentTurnID) {
 			continue
 		}
 		if _, ok := seen[msg.TurnID]; ok {
@@ -144,4 +144,9 @@ func lastNTurnIDs(messages []Message, currentTurnID string, n int) []string {
 		return ordered
 	}
 	return ordered[len(ordered)-n:]
+}
+
+// isPreviousUserTurn reports whether msg belongs to a user turn other than currentTurnID.
+func isPreviousUserTurn(msg Message, currentTurnID string) bool {
+	return msg.Role == RoleUser && msg.TurnID != "" && msg.TurnID != currentTurnID
 }

@@ -113,15 +113,7 @@ func runServe(ctx context.Context, port string) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		<-ctx.Done()
-		log.Info("shutting down server")
-
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Error("server shutdown error", slog.String("error", err.Error()))
-		}
+		gracefulShutdown(ctx, log, srv)
 	}()
 
 	log.Info("starting AG-UI server",
@@ -136,6 +128,17 @@ func runServe(ctx context.Context, port string) error {
 	wg.Wait()
 	log.Info("server stopped")
 	return nil
+}
+
+// gracefulShutdown waits for context cancellation then shuts down srv with a 30-second deadline.
+func gracefulShutdown(ctx context.Context, log *slog.Logger, srv *http.Server) {
+	<-ctx.Done()
+	log.Info("shutting down server")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error("server shutdown error", slog.String("error", err.Error()))
+	}
 }
 
 // extractUserInput returns the content of the last user message from the AG-UI message list.

@@ -175,7 +175,6 @@ func (r *MessageRepository) HandleMessageEvent(ctx context.Context, event domain
 	msg := event.Message
 	scope := event.SessionScope
 
-	// Check if session is materialized.
 	materialized, err := r.isSessionMaterialized(ctx, scope.SessionID())
 	if err != nil {
 		return err
@@ -184,13 +183,8 @@ func (r *MessageRepository) HandleMessageEvent(ctx context.Context, event domain
 		if msg.Role != domain.RoleUser {
 			return nil
 		}
-		// Materialize session with title = first user message.
-		title := msg.Content
-		if _, err := r.conn.ExecContext(ctx,
-			"INSERT INTO sessions (id, user_id, title, created_at) VALUES (?, ?, ?, ?)",
-			scope.SessionID(), scope.UserID(), title, time.Now().UTC().Format(timeFormat),
-		); err != nil {
-			return storeErr("materializing session", err)
+		if err := r.materializeSession(ctx, scope, msg.Content); err != nil {
+			return err
 		}
 	}
 
@@ -198,28 +192,11 @@ func (r *MessageRepository) HandleMessageEvent(ctx context.Context, event domain
 	content := msg.Content
 	toolName, toolInput, toolOutput, toolCallID := "", "", "", ""
 
-	if msg.Role == domain.RoleAssistant && len(msg.ToolCalls) > 0 {
-		rawCalls, err := json.Marshal(msg.ToolCalls)
-		if err == nil {
-			toolInput = string(rawCalls)
-		}
+	if msg.Role == domain.RoleAssistant {
+		toolInput = buildAssistantToolInput(msg.ToolCalls)
 	}
-
 	if msg.Role == domain.RoleTool {
-		if len(msg.ToolCalls) > 0 {
-			toolName = msg.ToolCalls[0].Name
-			toolCallID = msg.ToolCalls[0].ID
-			rawInput, err := json.Marshal(msg.ToolCalls[0].Input)
-			if err == nil {
-				toolInput = string(rawInput)
-			}
-		}
-		if len(msg.ToolResults) > 0 {
-			toolOutput = msg.ToolResults[0].Content
-			if toolCallID == "" {
-				toolCallID = msg.ToolResults[0].ToolCallID
-			}
-		}
+		toolName, toolInput, toolOutput, toolCallID = buildToolRoleFields(msg)
 	}
 
 	if _, err := r.conn.ExecContext(ctx,
@@ -300,6 +277,50 @@ func (r *MessageRepository) isSessionMaterialized(ctx context.Context, sessionID
 		return false, storeErr("checking session existence", err)
 	}
 	return count > 0, nil
+}
+
+// materializeSession inserts a new session row with the given title.
+func (r *MessageRepository) materializeSession(ctx context.Context, scope domain.SessionScope, title string) error {
+	_, err := r.conn.ExecContext(ctx,
+		"INSERT INTO sessions (id, user_id, title, created_at) VALUES (?, ?, ?, ?)",
+		scope.SessionID(), scope.UserID(), title, time.Now().UTC().Format(timeFormat),
+	)
+	if err != nil {
+		return storeErr("materializing session", err)
+	}
+	return nil
+}
+
+// buildAssistantToolInput marshals the tool calls of an assistant message into JSON.
+// Returns an empty string when there are no calls or marshaling fails.
+func buildAssistantToolInput(toolCalls []domain.ToolCall) string {
+	if len(toolCalls) == 0 {
+		return ""
+	}
+	rawCalls, err := json.Marshal(toolCalls)
+	if err != nil {
+		return ""
+	}
+	return string(rawCalls)
+}
+
+// buildToolRoleFields extracts the storage fields for a tool-role message.
+func buildToolRoleFields(msg domain.Message) (toolName, toolInput, toolOutput, toolCallID string) {
+	if len(msg.ToolCalls) > 0 {
+		toolName = msg.ToolCalls[0].Name
+		toolCallID = msg.ToolCalls[0].ID
+		rawInput, err := json.Marshal(msg.ToolCalls[0].Input)
+		if err == nil {
+			toolInput = string(rawInput)
+		}
+	}
+	if len(msg.ToolResults) > 0 {
+		toolOutput = msg.ToolResults[0].Content
+		if toolCallID == "" {
+			toolCallID = msg.ToolResults[0].ToolCallID
+		}
+	}
+	return
 }
 
 // AllMessages returns all messages for the given session.
