@@ -29,63 +29,7 @@ func TestHourlyForecastTool_Metadata(t *testing.T) {
 
 func TestHourlyForecastTool_Call_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		type hourlyResp struct {
-			Cod  string `json:"cod"`
-			Cnt  int    `json:"cnt"`
-			List []struct {
-				Dt   int64 `json:"dt"`
-				Main struct {
-					Temp      float64 `json:"temp"`
-					FeelsLike float64 `json:"feels_like"`
-					TempMin   float64 `json:"temp_min"`
-					TempMax   float64 `json:"temp_max"`
-					Pressure  int     `json:"pressure"`
-					Humidity  int     `json:"humidity"`
-					SeaLevel  int     `json:"sea_level"`
-					GrndLevel int     `json:"grnd_level"`
-				} `json:"main"`
-				Weather []struct {
-					ID          int    `json:"id"`
-					Main        string `json:"main"`
-					Description string `json:"description"`
-					Icon        string `json:"icon"`
-				} `json:"weather"`
-				Clouds struct {
-					All int `json:"all"`
-				} `json:"clouds"`
-				Wind struct {
-					Speed float64 `json:"speed"`
-					Deg   int     `json:"deg"`
-					Gust  float64 `json:"gust"`
-				} `json:"wind"`
-				Rain *struct {
-					OneH float64 `json:"1h"`
-				} `json:"rain"`
-				Snow *struct {
-					OneH float64 `json:"1h"`
-				} `json:"snow"`
-				Visibility int     `json:"visibility"`
-				Pop        float64 `json:"pop"`
-				Sys        struct {
-					Pod string `json:"pod"`
-				} `json:"sys"`
-				DtTxt string `json:"dt_txt"`
-			} `json:"list"`
-			City struct {
-				ID    int    `json:"id"`
-				Name  string `json:"name"`
-				Coord struct {
-					Lat float64 `json:"lat"`
-					Lon float64 `json:"lon"`
-				} `json:"coord"`
-				Country  string `json:"country"`
-				Timezone int    `json:"timezone"`
-				Sunrise  int64  `json:"sunrise"`
-				Sunset   int64  `json:"sunset"`
-			} `json:"city"`
-		}
-
-		var resp hourlyResp
+		var resp hourlyForecastResponse
 		resp.Cod = "200"
 		resp.Cnt = 2
 		resp.City.ID = 2988507
@@ -97,45 +41,7 @@ func TestHourlyForecastTool_Call_Success(t *testing.T) {
 		resp.City.Sunrise = 1711341600
 		resp.City.Sunset = 1711387200
 
-		resp.List = make([]struct {
-			Dt   int64 `json:"dt"`
-			Main struct {
-				Temp      float64 `json:"temp"`
-				FeelsLike float64 `json:"feels_like"`
-				TempMin   float64 `json:"temp_min"`
-				TempMax   float64 `json:"temp_max"`
-				Pressure  int     `json:"pressure"`
-				Humidity  int     `json:"humidity"`
-				SeaLevel  int     `json:"sea_level"`
-				GrndLevel int     `json:"grnd_level"`
-			} `json:"main"`
-			Weather []struct {
-				ID          int    `json:"id"`
-				Main        string `json:"main"`
-				Description string `json:"description"`
-				Icon        string `json:"icon"`
-			} `json:"weather"`
-			Clouds struct {
-				All int `json:"all"`
-			} `json:"clouds"`
-			Wind struct {
-				Speed float64 `json:"speed"`
-				Deg   int     `json:"deg"`
-				Gust  float64 `json:"gust"`
-			} `json:"wind"`
-			Rain *struct {
-				OneH float64 `json:"1h"`
-			} `json:"rain"`
-			Snow *struct {
-				OneH float64 `json:"1h"`
-			} `json:"snow"`
-			Visibility int     `json:"visibility"`
-			Pop        float64 `json:"pop"`
-			Sys        struct {
-				Pod string `json:"pod"`
-			} `json:"sys"`
-			DtTxt string `json:"dt_txt"`
-		}, 2)
+		resp.List = make([]hourlyRespListItem, 2)
 
 		resp.List[0].Dt = 1711360800
 		resp.List[0].Main.Temp = 18.5
@@ -146,12 +52,7 @@ func TestHourlyForecastTool_Call_Success(t *testing.T) {
 		resp.List[0].Main.Humidity = 72
 		resp.List[0].Main.SeaLevel = 1015
 		resp.List[0].Main.GrndLevel = 1010
-		resp.List[0].Weather = []struct {
-			ID          int    `json:"id"`
-			Main        string `json:"main"`
-			Description string `json:"description"`
-			Icon        string `json:"icon"`
-		}{{ID: 800, Main: "Clear", Description: "clear sky", Icon: "01d"}}
+		resp.List[0].Weather = []owmWeatherResponse{{ID: 800, Main: "Clear", Description: "clear sky", Icon: "01d"}}
 		resp.List[0].Clouds.All = 5
 		resp.List[0].Wind.Speed = 3.5
 		resp.List[0].Wind.Deg = 210
@@ -167,12 +68,7 @@ func TestHourlyForecastTool_Call_Success(t *testing.T) {
 		resp.List[1].Main.TempMax = 19.5
 		resp.List[1].Main.Pressure = 1014
 		resp.List[1].Main.Humidity = 68
-		resp.List[1].Weather = []struct {
-			ID          int    `json:"id"`
-			Main        string `json:"main"`
-			Description string `json:"description"`
-			Icon        string `json:"icon"`
-		}{{ID: 801, Main: "Clouds", Description: "few clouds", Icon: "02d"}}
+		resp.List[1].Weather = []owmWeatherResponse{{ID: 801, Main: "Clouds", Description: "few clouds", Icon: "02d"}}
 		resp.List[1].Clouds.All = 20
 		resp.List[1].Wind.Speed = 4.0
 		resp.List[1].Wind.Deg = 220

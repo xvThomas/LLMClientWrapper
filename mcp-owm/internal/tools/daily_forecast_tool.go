@@ -161,53 +161,43 @@ func (t *DailyForecastTool) Call(ctx context.Context, input DailyForecastToolInp
 	return out, nil
 }
 
+type dailyForecastTempResponse struct {
+	Day   float64 `json:"day"`
+	Min   float64 `json:"min"`
+	Max   float64 `json:"max"`
+	Night float64 `json:"night"`
+	Eve   float64 `json:"eve"`
+	Morn  float64 `json:"morn"`
+}
+
+type dailyForecastFeelsLikeResponse struct {
+	Day   float64 `json:"day"`
+	Night float64 `json:"night"`
+	Eve   float64 `json:"eve"`
+	Morn  float64 `json:"morn"`
+}
+
+type dailyForecastItemResponse struct {
+	Dt        int64                          `json:"dt"`
+	Temp      dailyForecastTempResponse      `json:"temp"`
+	FeelsLike dailyForecastFeelsLikeResponse `json:"feels_like"`
+	Pressure  int                            `json:"pressure"`
+	Humidity  int                            `json:"humidity"`
+	Weather   []owmWeatherResponse           `json:"weather"`
+	Speed     float64                        `json:"speed"`
+	Deg       int                            `json:"deg"`
+	Gust      float64                        `json:"gust"`
+	Clouds    int                            `json:"clouds"`
+	Pop       float64                        `json:"pop"`
+	Rain      float64                        `json:"rain"`
+	Snow      float64                        `json:"snow"`
+}
+
 type dailyForecastResponse struct {
-	Cod  interface{} `json:"cod"`
-	Cnt  int         `json:"cnt"`
-	List []struct {
-		Dt   int64 `json:"dt"`
-		Temp struct {
-			Day   float64 `json:"day"`
-			Min   float64 `json:"min"`
-			Max   float64 `json:"max"`
-			Night float64 `json:"night"`
-			Eve   float64 `json:"eve"`
-			Morn  float64 `json:"morn"`
-		} `json:"temp"`
-		FeelsLike struct {
-			Day   float64 `json:"day"`
-			Night float64 `json:"night"`
-			Eve   float64 `json:"eve"`
-			Morn  float64 `json:"morn"`
-		} `json:"feels_like"`
-		Pressure int `json:"pressure"`
-		Humidity int `json:"humidity"`
-		Weather  []struct {
-			ID          int    `json:"id"`
-			Main        string `json:"main"`
-			Description string `json:"description"`
-			Icon        string `json:"icon"`
-		} `json:"weather"`
-		Speed  float64 `json:"speed"`
-		Deg    int     `json:"deg"`
-		Gust   float64 `json:"gust"`
-		Clouds int     `json:"clouds"`
-		Pop    float64 `json:"pop"`
-		Rain   float64 `json:"rain"`
-		Snow   float64 `json:"snow"`
-	} `json:"list"`
-	City struct {
-		ID    int    `json:"id"`
-		Name  string `json:"name"`
-		Coord struct {
-			Lat float64 `json:"lat"`
-			Lon float64 `json:"lon"`
-		} `json:"coord"`
-		Country  string `json:"country"`
-		Timezone int    `json:"timezone"`
-		Sunrise  int64  `json:"sunrise"`
-		Sunset   int64  `json:"sunset"`
-	} `json:"city"`
+	Cod  any                         `json:"cod"`
+	Cnt  int                         `json:"cnt"`
+	List []dailyForecastItemResponse `json:"list"`
+	City owmCityResponse             `json:"city"`
 }
 
 func (t *DailyForecastTool) fetchDailyForecast(ctx context.Context, lat, lon float64, count int) (*dailyForecastResponse, error) {

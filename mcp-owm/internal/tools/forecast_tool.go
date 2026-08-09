@@ -149,60 +149,29 @@ func (t *Forecast5Days3HoursWeatherTool) Call(ctx context.Context, input Forecas
 	return out, nil
 }
 
+type forecastPrecipitationResponse struct {
+	ThreeH float64 `json:"3h"`
+}
+
+type forecastItemResponse struct {
+	Dt         int64                          `json:"dt"`
+	Main       owmMainResponse                `json:"main"`
+	Weather    []owmWeatherResponse           `json:"weather"`
+	Clouds     owmCloudsResponse              `json:"clouds"`
+	Wind       owmWindResponse                `json:"wind"`
+	Rain       *forecastPrecipitationResponse `json:"rain"`
+	Snow       *forecastPrecipitationResponse `json:"snow"`
+	Visibility int                            `json:"visibility"`
+	Pop        float64                        `json:"pop"`
+	Sys        owmSysResponse                 `json:"sys"`
+	DtTxt      string                         `json:"dt_txt"`
+}
+
 type forecastResponse struct {
-	Cod  string `json:"cod"`
-	Cnt  int    `json:"cnt"`
-	List []struct {
-		Dt   int64 `json:"dt"`
-		Main struct {
-			Temp      float64 `json:"temp"`
-			FeelsLike float64 `json:"feels_like"`
-			TempMin   float64 `json:"temp_min"`
-			TempMax   float64 `json:"temp_max"`
-			Pressure  int     `json:"pressure"`
-			Humidity  int     `json:"humidity"`
-			SeaLevel  int     `json:"sea_level"`
-			GrndLevel int     `json:"grnd_level"`
-		} `json:"main"`
-		Weather []struct {
-			ID          int    `json:"id"`
-			Main        string `json:"main"`
-			Description string `json:"description"`
-			Icon        string `json:"icon"`
-		} `json:"weather"`
-		Clouds struct {
-			All int `json:"all"`
-		} `json:"clouds"`
-		Wind struct {
-			Speed float64 `json:"speed"`
-			Deg   int     `json:"deg"`
-			Gust  float64 `json:"gust"`
-		} `json:"wind"`
-		Rain *struct {
-			ThreeH float64 `json:"3h"`
-		} `json:"rain"`
-		Snow *struct {
-			ThreeH float64 `json:"3h"`
-		} `json:"snow"`
-		Visibility int     `json:"visibility"`
-		Pop        float64 `json:"pop"`
-		Sys        struct {
-			Pod string `json:"pod"`
-		} `json:"sys"`
-		DtTxt string `json:"dt_txt"`
-	} `json:"list"`
-	City struct {
-		ID    int    `json:"id"`
-		Name  string `json:"name"`
-		Coord struct {
-			Lat float64 `json:"lat"`
-			Lon float64 `json:"lon"`
-		} `json:"coord"`
-		Country  string `json:"country"`
-		Timezone int    `json:"timezone"`
-		Sunrise  int64  `json:"sunrise"`
-		Sunset   int64  `json:"sunset"`
-	} `json:"city"`
+	Cod  string                 `json:"cod"`
+	Cnt  int                    `json:"cnt"`
+	List []forecastItemResponse `json:"list"`
+	City owmCityResponse        `json:"city"`
 }
 
 func (t *Forecast5Days3HoursWeatherTool) fetchForecast(ctx context.Context, lat, lon float64, count int) (*forecastResponse, error) {

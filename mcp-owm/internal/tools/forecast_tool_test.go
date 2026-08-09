@@ -42,45 +42,7 @@ func TestForecast5Days3HoursWeatherTool_Call_Success(t *testing.T) {
 		resp.City.Sunrise = 1711341600
 		resp.City.Sunset = 1711387200
 
-		resp.List = make([]struct {
-			Dt   int64 `json:"dt"`
-			Main struct {
-				Temp      float64 `json:"temp"`
-				FeelsLike float64 `json:"feels_like"`
-				TempMin   float64 `json:"temp_min"`
-				TempMax   float64 `json:"temp_max"`
-				Pressure  int     `json:"pressure"`
-				Humidity  int     `json:"humidity"`
-				SeaLevel  int     `json:"sea_level"`
-				GrndLevel int     `json:"grnd_level"`
-			} `json:"main"`
-			Weather []struct {
-				ID          int    `json:"id"`
-				Main        string `json:"main"`
-				Description string `json:"description"`
-				Icon        string `json:"icon"`
-			} `json:"weather"`
-			Clouds struct {
-				All int `json:"all"`
-			} `json:"clouds"`
-			Wind struct {
-				Speed float64 `json:"speed"`
-				Deg   int     `json:"deg"`
-				Gust  float64 `json:"gust"`
-			} `json:"wind"`
-			Rain *struct {
-				ThreeH float64 `json:"3h"`
-			} `json:"rain"`
-			Snow *struct {
-				ThreeH float64 `json:"3h"`
-			} `json:"snow"`
-			Visibility int     `json:"visibility"`
-			Pop        float64 `json:"pop"`
-			Sys        struct {
-				Pod string `json:"pod"`
-			} `json:"sys"`
-			DtTxt string `json:"dt_txt"`
-		}, 2)
+		resp.List = make([]forecastItemResponse, 2)
 
 		resp.List[0].Dt = 1711360800
 		resp.List[0].Main.Temp = 18.5
@@ -91,12 +53,7 @@ func TestForecast5Days3HoursWeatherTool_Call_Success(t *testing.T) {
 		resp.List[0].Main.Humidity = 72
 		resp.List[0].Main.SeaLevel = 1013
 		resp.List[0].Main.GrndLevel = 1010
-		resp.List[0].Weather = []struct {
-			ID          int    `json:"id"`
-			Main        string `json:"main"`
-			Description string `json:"description"`
-			Icon        string `json:"icon"`
-		}{{ID: 800, Main: "Clear", Description: "clear sky", Icon: "01d"}}
+		resp.List[0].Weather = []owmWeatherResponse{{ID: 800, Main: "Clear", Description: "clear sky", Icon: "01d"}}
 		resp.List[0].Clouds.All = 5
 		resp.List[0].Wind.Speed = 3.5
 		resp.List[0].Wind.Deg = 210
@@ -112,12 +69,7 @@ func TestForecast5Days3HoursWeatherTool_Call_Success(t *testing.T) {
 		resp.List[1].Main.TempMax = 21.0
 		resp.List[1].Main.Pressure = 1012
 		resp.List[1].Main.Humidity = 68
-		resp.List[1].Weather = []struct {
-			ID          int    `json:"id"`
-			Main        string `json:"main"`
-			Description string `json:"description"`
-			Icon        string `json:"icon"`
-		}{{ID: 802, Main: "Clouds", Description: "scattered clouds", Icon: "03d"}}
+		resp.List[1].Weather = []owmWeatherResponse{{ID: 802, Main: "Clouds", Description: "scattered clouds", Icon: "03d"}}
 		resp.List[1].Clouds.All = 40
 		resp.List[1].Wind.Speed = 4.1
 		resp.List[1].Wind.Deg = 220
