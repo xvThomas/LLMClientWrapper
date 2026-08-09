@@ -179,7 +179,7 @@ func (m mockTool) Call(_ context.Context, input mockInput) (mockOutput, error) {
 }
 
 func TestRegisterTool(t *testing.T) {
-	tr := RegisterTool[mockInput, mockOutput](mockTool{})
+	tr := RegisterTool(mockTool{})
 
 	if tr.Name != "mock-tool" {
 		t.Errorf("expected name %q, got %q", "mock-tool", tr.Name)
@@ -220,7 +220,7 @@ func TestRegisterPrompt(t *testing.T) {
 }
 
 func TestNewServer(t *testing.T) {
-	tr := RegisterTool[mockInput, mockOutput](mockTool{})
+	tr := RegisterTool(mockTool{})
 	pr := RegisterPrompt(Prompt{
 		Name:        "test-prompt",
 		Description: "Test",

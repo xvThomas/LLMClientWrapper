@@ -40,37 +40,50 @@ func (b *ContextBuilder) BuildContextMessages(ctx context.Context, currentTurnID
 		return allMessages
 	}
 
-	selectedDetailedTurnIDs := make(map[string]struct{})
-	selectedDetailedTurnIDs[currentTurnID] = struct{}{}
+	selectedDetailedTurnIDs := selectDetailedTurnIDs(allMessages, historyTurns, currentTurnID, b.contextFull)
+	messages := historyTurnsAsMessages(historyTurns, selectedDetailedTurnIDs, currentTurnID)
+	availableDetailedTurnIDs := buildAvailableDetailedSet(allMessages, selectedDetailedTurnIDs)
+	messages = appendFallbackSummaries(messages, historyTurns, selectedDetailedTurnIDs, availableDetailedTurnIDs, currentTurnID)
+	return appendDetailedMessages(messages, allMessages, selectedDetailedTurnIDs)
+}
 
-	if b.contextFull > 0 {
-		for _, turnID := range lastNTurnIDs(allMessages, currentTurnID, b.contextFull) {
-			selectedDetailedTurnIDs[turnID] = struct{}{}
+// selectDetailedTurnIDs builds the set of turn IDs that should be included with
+// full message detail: the current turn, the last contextFull user turns, and
+// any turns still in an incomplete state.
+func selectDetailedTurnIDs(allMessages []Message, historyTurns []HistoryTurn, currentTurnID string, contextFull int) map[string]struct{} {
+	ids := make(map[string]struct{})
+	ids[currentTurnID] = struct{}{}
+	if contextFull > 0 {
+		for _, turnID := range lastNTurnIDs(allMessages, currentTurnID, contextFull) {
+			ids[turnID] = struct{}{}
 		}
 	}
-
-	// Force-include incomplete turns in detail regardless of context mode.
 	for _, turn := range historyTurns {
 		if turn.Status == TurnStatusIncomplete {
-			selectedDetailedTurnIDs[turn.TurnID] = struct{}{}
+			ids[turn.TurnID] = struct{}{}
 		}
 	}
+	return ids
+}
 
-	messages := historyTurnsAsMessages(historyTurns, selectedDetailedTurnIDs, currentTurnID)
-
-	// Build a set of turn IDs that actually have detailed messages available.
-	availableDetailedTurnIDs := make(map[string]struct{})
+// buildAvailableDetailedSet returns the subset of selectedDetailedTurnIDs for
+// which at least one detailed message exists in allMessages.
+func buildAvailableDetailedSet(allMessages []Message, selectedDetailedTurnIDs map[string]struct{}) map[string]struct{} {
+	available := make(map[string]struct{})
 	for _, msg := range allMessages {
 		if msg.TurnID == "" {
 			continue
 		}
 		if _, ok := selectedDetailedTurnIDs[msg.TurnID]; ok {
-			availableDetailedTurnIDs[msg.TurnID] = struct{}{}
+			available[msg.TurnID] = struct{}{}
 		}
 	}
+	return available
+}
 
-	// Fallback: if a turn was selected for detail but has no messages in store,
-	// include it as a summary so context is not silently lost.
+// appendFallbackSummaries emits summary messages for any turn that was selected
+// for detail but has no detailed messages available in the store.
+func appendFallbackSummaries(messages []Message, historyTurns []HistoryTurn, selectedDetailedTurnIDs, availableDetailedTurnIDs map[string]struct{}, currentTurnID string) []Message {
 	for turnID := range selectedDetailedTurnIDs {
 		if turnID == currentTurnID {
 			continue
@@ -78,20 +91,32 @@ func (b *ContextBuilder) BuildContextMessages(ctx context.Context, currentTurnID
 		if _, ok := availableDetailedTurnIDs[turnID]; ok {
 			continue
 		}
-		// No detailed messages found — emit summary from history turn as fallback.
-		for _, turn := range historyTurns {
-			if turn.TurnID == turnID {
-				if turn.Question != "" {
-					messages = append(messages, Message{Role: RoleUser, Content: turn.Question, TurnID: turn.TurnID})
-				}
-				if turn.Answer != "" {
-					messages = append(messages, Message{Role: RoleAssistant, Content: turn.Answer, TurnID: turn.TurnID})
-				}
-				break
-			}
-		}
+		messages = appendFallbackSummary(messages, historyTurns, turnID)
 	}
+	return messages
+}
 
+// appendFallbackSummary finds the history turn matching turnID and appends its
+// question/answer as plain user/assistant messages.
+func appendFallbackSummary(messages []Message, historyTurns []HistoryTurn, turnID string) []Message {
+	for _, turn := range historyTurns {
+		if turn.TurnID != turnID {
+			continue
+		}
+		if turn.Question != "" {
+			messages = append(messages, Message{Role: RoleUser, Content: turn.Question, TurnID: turn.TurnID})
+		}
+		if turn.Answer != "" {
+			messages = append(messages, Message{Role: RoleAssistant, Content: turn.Answer, TurnID: turn.TurnID})
+		}
+		break
+	}
+	return messages
+}
+
+// appendDetailedMessages appends all messages whose turn is in selectedDetailedTurnIDs,
+// plus any message without a turn ID.
+func appendDetailedMessages(messages []Message, allMessages []Message, selectedDetailedTurnIDs map[string]struct{}) []Message {
 	for _, msg := range allMessages {
 		if msg.TurnID == "" {
 			messages = append(messages, msg)
@@ -101,7 +126,6 @@ func (b *ContextBuilder) BuildContextMessages(ctx context.Context, currentTurnID
 			messages = append(messages, msg)
 		}
 	}
-
 	return messages
 }
 

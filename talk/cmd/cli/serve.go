@@ -134,7 +134,7 @@ func runServe(ctx context.Context, port string) error {
 func gracefulShutdown(ctx context.Context, log *slog.Logger, srv *http.Server) {
 	<-ctx.Done()
 	log.Info("shutting down server")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Error("server shutdown error", slog.String("error", err.Error()))

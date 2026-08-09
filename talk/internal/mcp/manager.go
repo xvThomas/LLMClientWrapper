@@ -144,27 +144,7 @@ func (m *Manager) reconnect(ctx context.Context, cfg ServerConfig) (*mcp.ClientS
 
 		status, session, tools, _ := m.connectServer(ctx, cfg)
 		if status.Error != "" {
-			m.log.Error(logMsgMCPReconnect,
-				"reconnect_event", "result",
-				"outcome", "failure",
-				"correlation_id", reconnectID,
-				"duration_ms", time.Since(startedAt).Milliseconds(),
-				"error_class", classifyReconnectError(status.Error),
-				"server_id", cfg.ID,
-				"server_name", cfg.Name,
-				"server_url", cfg.URL,
-				"error", status.Error,
-			)
-			// Update status only — do not evict the existing session, which may have recovered.
-			m.mu.Lock()
-			for i := range m.statuses {
-				if m.statuses[i].Config.ID == cfg.ID {
-					m.statuses[i] = status
-					break
-				}
-			}
-			m.mu.Unlock()
-			return nil, fmt.Errorf("%w: %s", ErrSessionUnavailable, status.Error)
+			return nil, m.applyReconnectFailure(reconnectID, startedAt, cfg, status)
 		}
 
 		m.storeConnectionState(cfg, status, session, tools)
@@ -184,6 +164,31 @@ func (m *Manager) reconnect(ctx context.Context, cfg ServerConfig) (*mcp.ClientS
 		return nil, err
 	}
 	return v.(*mcp.ClientSession), nil
+}
+
+// applyReconnectFailure logs the reconnect failure, updates the stored status,
+// and returns an ErrSessionUnavailable-wrapped error.
+func (m *Manager) applyReconnectFailure(reconnectID string, startedAt time.Time, cfg ServerConfig, status ServerStatus) error {
+	m.log.Error(logMsgMCPReconnect,
+		"reconnect_event", "result",
+		"outcome", "failure",
+		"correlation_id", reconnectID,
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+		"error_class", classifyReconnectError(status.Error),
+		"server_id", cfg.ID,
+		"server_name", cfg.Name,
+		"server_url", cfg.URL,
+		"error", status.Error,
+	)
+	m.mu.Lock()
+	for i := range m.statuses {
+		if m.statuses[i].Config.ID == cfg.ID {
+			m.statuses[i] = status
+			break
+		}
+	}
+	m.mu.Unlock()
+	return fmt.Errorf("%w: %s", ErrSessionUnavailable, status.Error)
 }
 
 func (m *Manager) nextReconnectID(serverID string) string {
@@ -283,29 +288,11 @@ func (m *Manager) Refresh(ctx context.Context) int {
 	refreshedTools := []domain.Tool{}
 	for i := range statuses {
 		st := &statuses[i]
-		st.Tools = nil
-
 		session, ok := sessions[st.Config.ID]
 		if !ok || !st.Connected {
 			continue
 		}
-
-		toolsResult, err := session.ListTools(ctx, &mcp.ListToolsParams{})
-		if err != nil {
-			st.Error = fmt.Sprintf("failed to refresh tools: %v", err)
-			continue
-		}
-
-		st.Error = ""
-		for _, t := range toolsResult.Tools {
-			st.Tools = append(st.Tools, t.Name)
-			refreshedTools = append(refreshedTools, &mcpToolAdapter{
-				manager:    m,
-				serverID:   st.Config.ID,
-				serverName: st.Config.Name,
-				tool:       *t,
-			})
-		}
+		refreshedTools = append(refreshedTools, m.refreshOneServer(ctx, st, session)...)
 	}
 
 	// Track which server IDs were in this refresh snapshot.
@@ -315,7 +302,40 @@ func (m *Manager) Refresh(ctx context.Context) int {
 	}
 
 	m.mu.Lock()
-	// Merge refreshed statuses by ID — preserve entries added after the snapshot.
+	m.mergeRefreshedStatuses(statuses)
+	m.tools = append(filterToolsNotIn(m.tools, refreshedIDs), refreshedTools...)
+	count := len(m.tools)
+	m.mu.Unlock()
+	return count
+}
+
+// refreshOneServer re-queries the tool list for a single server and updates its
+// status in place. Returns the freshly constructed tool adapters.
+func (m *Manager) refreshOneServer(ctx context.Context, st *ServerStatus, session *mcp.ClientSession) []domain.Tool {
+	st.Tools = nil
+	toolsResult, err := session.ListTools(ctx, &mcp.ListToolsParams{})
+	if err != nil {
+		st.Error = fmt.Sprintf("failed to refresh tools: %v", err)
+		return nil
+	}
+	st.Error = ""
+	tools := make([]domain.Tool, 0, len(toolsResult.Tools))
+	for _, t := range toolsResult.Tools {
+		st.Tools = append(st.Tools, t.Name)
+		tools = append(tools, &mcpToolAdapter{
+			manager:    m,
+			serverID:   st.Config.ID,
+			serverName: st.Config.Name,
+			tool:       *t,
+		})
+	}
+	return tools
+}
+
+// mergeRefreshedStatuses updates m.statuses in place with refreshed snapshots,
+// appending any server that was added after the snapshot was taken.
+// Caller must hold m.mu.
+func (m *Manager) mergeRefreshedStatuses(statuses []ServerStatus) {
 	for _, st := range statuses {
 		found := false
 		for i := range m.statuses {
@@ -329,18 +349,18 @@ func (m *Manager) Refresh(ctx context.Context) int {
 			m.statuses = append(m.statuses, st)
 		}
 	}
-	// Keep tools for servers not in the snapshot; replace only those that were refreshed.
-	var keptTools []domain.Tool
-	for _, t := range m.tools {
-		if adapter, ok := t.(*mcpToolAdapter); ok && refreshedIDs[adapter.serverID] {
+}
+
+// filterToolsNotIn returns the tools whose server ID is not in serverIDs.
+func filterToolsNotIn(tools []domain.Tool, serverIDs map[string]bool) []domain.Tool {
+	var kept []domain.Tool
+	for _, t := range tools {
+		if adapter, ok := t.(*mcpToolAdapter); ok && serverIDs[adapter.serverID] {
 			continue
 		}
-		keptTools = append(keptTools, t)
+		kept = append(kept, t)
 	}
-	m.tools = append(keptTools, refreshedTools...)
-	count := len(m.tools)
-	m.mu.Unlock()
-	return count
+	return kept
 }
 
 // Tools returns all tools from all connected MCP servers.

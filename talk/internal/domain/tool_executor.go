@@ -114,7 +114,7 @@ func (e *ToolExecutor) executeSingleTool(ctx context.Context, turnID string, cal
 
 func (e *ToolExecutor) executeParallel(ctx context.Context, turnID string, calls []ToolCall) ([]ToolExecutionResult, error) {
 	executions := make([]ToolExecutionResult, len(calls))
-	errors := make([]error, len(calls))
+	errs := make([]error, len(calls))
 
 	sem := make(chan struct{}, e.maxConcurrent)
 	var wg sync.WaitGroup
@@ -124,51 +124,15 @@ func (e *ToolExecutor) executeParallel(ctx context.Context, turnID string, calls
 		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
-
-			startedAt := time.Now()
-			if e.eventHandler != nil {
-				if err := e.eventHandler.HandleToolCallStart(ctx, ToolCallEvent{
-					TurnID:    turnID,
-					ToolCall:  toolCall,
-					StartedAt: startedAt,
-				}); err != nil {
-					errors[idx] = fmt.Errorf("handling tool call start: %w", err)
-					return
-				}
-			}
-			result, execErr := e.ExecuteTool(ctx, toolCall)
-			endedAt := time.Now()
-			if execErr != nil {
-				result = ToolResult{ToolCallID: toolCall.ID, Content: formatToolError(execErr)}
-			}
-			if e.eventHandler != nil {
-				if err := e.eventHandler.HandleToolCallEnd(ctx, ToolCallEndEvent{
-					TurnID:    turnID,
-					ToolCall:  toolCall,
-					Result:    result,
-					StartedAt: startedAt,
-					EndedAt:   endedAt,
-				}); err != nil {
-					errors[idx] = fmt.Errorf("handling tool call end: %w", err)
-					return
-				}
-			}
-			executions[idx] = ToolExecutionResult{
-				Message: Message{
-					Role:        RoleTool,
-					ToolCalls:   []ToolCall{toolCall},
-					ToolResults: []ToolResult{result},
-					TurnID:      turnID,
-				},
-				StartedAt: startedAt,
-				EndedAt:   endedAt,
-			}
+			ex, err := e.executeSingleTool(ctx, turnID, toolCall)
+			errs[idx] = err
+			executions[idx] = ex
 		})
 	}
 
 	wg.Wait()
 
-	for i, err := range errors {
+	for i, err := range errs {
 		if err != nil {
 			return nil, fmt.Errorf("tool %q failed: %w", calls[i].Name, err)
 		}
