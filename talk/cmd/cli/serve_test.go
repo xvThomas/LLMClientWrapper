@@ -81,10 +81,10 @@ func TestCorsMiddleware(t *testing.T) {
 		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
 			t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, "*")
 		}
-		if got := rec.Header().Get("Access-Control-Allow-Methods"); got == "" {
+		if rec.Header().Get("Access-Control-Allow-Methods") == "" {
 			t.Error("Access-Control-Allow-Methods header is empty")
 		}
-		if got := rec.Header().Get("Access-Control-Allow-Headers"); got == "" {
+		if rec.Header().Get("Access-Control-Allow-Headers") == "" {
 			t.Error("Access-Control-Allow-Headers header is empty")
 		}
 	})
