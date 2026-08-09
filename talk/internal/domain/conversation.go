@@ -259,37 +259,45 @@ func formatMessagesAsInput(messages []Message, systemPrompt string) string {
 	if len(messages) == 0 {
 		return systemPrompt
 	}
-
-	// If the latest messages are tool results, concatenate all contiguous tool
-	// outputs because the model receives each tool output as a separate message.
 	last := messages[len(messages)-1]
 	if last.Role == RoleTool && len(last.ToolResults) > 0 {
-		start := len(messages) - 1
-		for start > 0 && messages[start-1].Role == RoleTool {
-			start--
-		}
-		var b strings.Builder
-		isFirst := true
-		for i := start; i < len(messages); i++ {
-			for _, tr := range messages[i].ToolResults {
-				if !isFirst {
-					b.WriteString("\n")
-				}
-				b.WriteString(tr.Content)
-				isFirst = false
-			}
-		}
-		return b.String()
+		return collectContiguousToolResults(messages)
 	}
+	if content := findLastUserContent(messages); content != "" {
+		return content
+	}
+	return systemPrompt
+}
 
-	// Otherwise return the last user message
+// collectContiguousToolResults concatenates the content of all contiguous tool
+// messages at the tail of the slice, separated by newlines.
+func collectContiguousToolResults(messages []Message) string {
+	start := len(messages) - 1
+	for start > 0 && messages[start-1].Role == RoleTool {
+		start--
+	}
+	var b strings.Builder
+	isFirst := true
+	for i := start; i < len(messages); i++ {
+		for _, tr := range messages[i].ToolResults {
+			if !isFirst {
+				b.WriteString("\n")
+			}
+			b.WriteString(tr.Content)
+			isFirst = false
+		}
+	}
+	return b.String()
+}
+
+// findLastUserContent returns the content of the last user message, or "" if none.
+func findLastUserContent(messages []Message) string {
 	for i := len(messages) - 1; i >= 0; i-- {
 		if messages[i].Role == RoleUser {
 			return messages[i].Content
 		}
 	}
-
-	return systemPrompt
+	return ""
 }
 
 // formatAPICallOutput returns a human-readable output for an API call.

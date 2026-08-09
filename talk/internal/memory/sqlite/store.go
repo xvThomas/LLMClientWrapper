@@ -339,48 +339,69 @@ func (r *MessageRepository) AllMessages(ctx context.Context, sessionID string) (
 
 	var messages []domain.Message
 	for rows.Next() {
-		var role, content, toolName, toolInput, toolOutput, toolCallID, turnID string
-		if err := rows.Scan(&role, &content, &toolName, &toolInput, &toolOutput, &toolCallID, &turnID); err != nil {
-			return nil, storeErr("scanning message", err)
+		msg, err := scanMessageRow(rows)
+		if err != nil {
+			return nil, err
 		}
-		msg := domain.Message{
-			Role:    domain.Role(role),
-			Content: content,
-			TurnID:  turnID,
-		}
-
-		switch msg.Role {
-		case domain.RoleAssistant:
-			if toolInput != "" {
-				var calls []domain.ToolCall
-				if err := json.Unmarshal([]byte(toolInput), &calls); err == nil {
-					msg.ToolCalls = calls
-				}
-			}
-		case domain.RoleTool:
-			if toolName != "" || toolInput != "" || toolOutput != "" || toolCallID != "" {
-				var input map[string]any
-				if toolInput != "" {
-					_ = json.Unmarshal([]byte(toolInput), &input)
-				}
-				msg.ToolCalls = append(msg.ToolCalls, domain.ToolCall{
-					ID:    toolCallID,
-					Name:  toolName,
-					Input: input,
-				})
-				msg.ToolResults = append(msg.ToolResults, domain.ToolResult{
-					ToolCallID: toolCallID,
-					Content:    toolOutput,
-				})
-			}
-		}
-
 		messages = append(messages, msg)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, storeErr("iterating messages", err)
 	}
 	return messages, nil
+}
+
+// scanMessageRow scans one row from the messages query and reconstructs the domain.Message.
+func scanMessageRow(rows *sql.Rows) (domain.Message, error) {
+	var role, content, toolName, toolInput, toolOutput, toolCallID, turnID string
+	if err := rows.Scan(&role, &content, &toolName, &toolInput, &toolOutput, &toolCallID, &turnID); err != nil {
+		return domain.Message{}, storeErr("scanning message", err)
+	}
+	msg := domain.Message{
+		Role:    domain.Role(role),
+		Content: content,
+		TurnID:  turnID,
+	}
+	switch msg.Role {
+	case domain.RoleAssistant:
+		msg = buildAssistantMessage(msg, toolInput)
+	case domain.RoleTool:
+		msg = buildToolMessage(msg, toolName, toolInput, toolOutput, toolCallID)
+	}
+	return msg, nil
+}
+
+// buildAssistantMessage attaches unmarshalled tool calls to an assistant message.
+func buildAssistantMessage(msg domain.Message, toolInput string) domain.Message {
+	if toolInput == "" {
+		return msg
+	}
+	var calls []domain.ToolCall
+	if err := json.Unmarshal([]byte(toolInput), &calls); err == nil {
+		msg.ToolCalls = calls
+	}
+	return msg
+}
+
+// buildToolMessage attaches tool call and tool result to a tool-role message.
+func buildToolMessage(msg domain.Message, toolName, toolInput, toolOutput, toolCallID string) domain.Message {
+	if toolName == "" && toolInput == "" && toolOutput == "" && toolCallID == "" {
+		return msg
+	}
+	var input map[string]any
+	if toolInput != "" {
+		_ = json.Unmarshal([]byte(toolInput), &input)
+	}
+	msg.ToolCalls = append(msg.ToolCalls, domain.ToolCall{
+		ID:    toolCallID,
+		Name:  toolName,
+		Input: input,
+	})
+	msg.ToolResults = append(msg.ToolResults, domain.ToolResult{
+		ToolCallID: toolCallID,
+		Content:    toolOutput,
+	})
+	return msg
 }
 
 // ClearMessages removes all messages from the given session (in DB).

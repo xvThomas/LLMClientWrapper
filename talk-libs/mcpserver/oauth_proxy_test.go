@@ -112,7 +112,7 @@ func TestRegisterASProxy_Token_ClientSecretNotOverwritten(t *testing.T) {
 	registerASProxy(mux, "http://localhost:8080", cfg)
 
 	form := "grant_type=authorization_code&code=abc&client_secret=client-provided-secret"
-	req := httptest.NewRequest(http.MethodPost, "/token", strings.NewReader(form))
+	req := httptest.NewRequest(http.MethodPost, tokenEndpointPath, strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
@@ -148,7 +148,7 @@ func TestRegisterASProxy_Token_AuthorizationHeaderForwarded(t *testing.T) {
 	registerASProxy(mux, "http://localhost:8080", cfg)
 
 	form := "grant_type=authorization_code&code=abc"
-	req := httptest.NewRequest(http.MethodPost, "/token", strings.NewReader(form))
+	req := httptest.NewRequest(http.MethodPost, tokenEndpointPath, strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
 	rr := httptest.NewRecorder()
@@ -176,7 +176,7 @@ func TestRegisterASProxy_Token_UpstreamUnreachable(t *testing.T) {
 	registerASProxy(mux, "http://localhost:8080", cfg)
 
 	form := "grant_type=authorization_code&code=abc"
-	req := httptest.NewRequest(http.MethodPost, "/token", strings.NewReader(form))
+	req := httptest.NewRequest(http.MethodPost, tokenEndpointPath, strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)

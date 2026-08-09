@@ -201,8 +201,8 @@ func buildAllowedPaths(hasOAuth bool) map[string]bool {
 	if hasOAuth {
 		paths["/.well-known/oauth-protected-resource"] = true
 		paths["/.well-known/oauth-authorization-server"] = true
-		paths["/authorize"] = true
-		paths["/token"] = true
+		paths[authorizeEndpointPath] = true
+		paths[tokenEndpointPath] = true
 		paths["/register"] = true
 	}
 	return paths
@@ -220,22 +220,29 @@ func parseTrustedProxies(raw string) []net.IPNet {
 		if entry == "" {
 			continue
 		}
-		if strings.Contains(entry, "/") {
-			_, ipNet, err := net.ParseCIDR(entry)
-			if err == nil {
-				nets = append(nets, *ipNet)
-			}
-		} else {
-			ip := net.ParseIP(entry)
-			if ip == nil {
-				continue
-			}
-			if ip4 := ip.To4(); ip4 != nil {
-				nets = append(nets, net.IPNet{IP: ip4, Mask: net.CIDRMask(32, 32)})
-			} else {
-				nets = append(nets, net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)})
-			}
+		if ipNet, ok := parseSingleProxy(entry); ok {
+			nets = append(nets, ipNet)
 		}
 	}
 	return nets
+}
+
+// parseSingleProxy parses a single CIDR block or plain IP address into a net.IPNet.
+// Plain IPv4 addresses become /32 networks; plain IPv6 become /128 networks.
+func parseSingleProxy(entry string) (net.IPNet, bool) {
+	if strings.Contains(entry, "/") {
+		_, ipNet, err := net.ParseCIDR(entry)
+		if err != nil {
+			return net.IPNet{}, false
+		}
+		return *ipNet, true
+	}
+	ip := net.ParseIP(entry)
+	if ip == nil {
+		return net.IPNet{}, false
+	}
+	if ip4 := ip.To4(); ip4 != nil {
+		return net.IPNet{IP: ip4, Mask: net.CIDRMask(32, 32)}, true
+	}
+	return net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)}, true
 }

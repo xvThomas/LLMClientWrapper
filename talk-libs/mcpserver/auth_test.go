@@ -542,12 +542,12 @@ func TestRegisterASProxy_Token(t *testing.T) {
 	mux := http.NewServeMux()
 	registerASProxy(mux, "http://localhost:8080", cfg)
 
-	req := httptest.NewRequest(http.MethodPost, "/token", nil)
+	req := httptest.NewRequest(http.MethodPost, tokenEndpointPath, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Body = io.NopCloser(io.Reader(httptest.NewRequest(http.MethodPost, "/", nil).Body))
 	// Use a proper form body.
 	form := "grant_type=authorization_code&code=abc123&client_id=my-client"
-	req = httptest.NewRequest(http.MethodPost, "/token", io.NopCloser(io.Reader(
+	req = httptest.NewRequest(http.MethodPost, tokenEndpointPath, io.NopCloser(io.Reader(
 		&stringReader{s: form},
 	)))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -578,7 +578,7 @@ func TestRegisterASProxy_Token_MethodNotAllowed(t *testing.T) {
 	mux := http.NewServeMux()
 	registerASProxy(mux, "http://localhost:8080", cfg)
 
-	req := httptest.NewRequest(http.MethodGet, "/token", nil)
+	req := httptest.NewRequest(http.MethodGet, tokenEndpointPath, nil)
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
 
@@ -606,7 +606,7 @@ func TestRegisterASProxy_Token_UpstreamError(t *testing.T) {
 	registerASProxy(mux, "http://localhost:8080", cfg)
 
 	form := "grant_type=authorization_code&code=abc"
-	req := httptest.NewRequest(http.MethodPost, "/token", io.NopCloser(io.Reader(
+	req := httptest.NewRequest(http.MethodPost, tokenEndpointPath, io.NopCloser(io.Reader(
 		&stringReader{s: form},
 	)))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

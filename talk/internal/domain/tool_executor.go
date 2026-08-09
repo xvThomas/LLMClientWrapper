@@ -63,44 +63,53 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, call ToolCall) (ToolResu
 func (e *ToolExecutor) executeSequential(ctx context.Context, turnID string, calls []ToolCall) ([]ToolExecutionResult, error) {
 	executions := make([]ToolExecutionResult, 0, len(calls))
 	for _, call := range calls {
-		startedAt := time.Now()
-		if e.eventHandler != nil {
-			if err := e.eventHandler.HandleToolCallStart(ctx, ToolCallEvent{
-				TurnID:    turnID,
-				ToolCall:  call,
-				StartedAt: startedAt,
-			}); err != nil {
-				return nil, fmt.Errorf("handling tool call start: %w", err)
-			}
+		ex, err := e.executeSingleTool(ctx, turnID, call)
+		if err != nil {
+			return nil, err
 		}
-		result, execErr := e.ExecuteTool(ctx, call)
-		endedAt := time.Now()
-		if execErr != nil {
-			result = ToolResult{ToolCallID: call.ID, Content: formatToolError(execErr)}
-		}
-		if e.eventHandler != nil {
-			if err := e.eventHandler.HandleToolCallEnd(ctx, ToolCallEndEvent{
-				TurnID:    turnID,
-				ToolCall:  call,
-				Result:    result,
-				StartedAt: startedAt,
-				EndedAt:   endedAt,
-			}); err != nil {
-				return nil, fmt.Errorf("handling tool call end: %w", err)
-			}
-		}
-		executions = append(executions, ToolExecutionResult{
-			Message: Message{
-				Role:        RoleTool,
-				ToolCalls:   []ToolCall{call},
-				ToolResults: []ToolResult{result},
-				TurnID:      turnID,
-			},
-			StartedAt: startedAt,
-			EndedAt:   endedAt,
-		})
+		executions = append(executions, ex)
 	}
 	return executions, nil
+}
+
+// executeSingleTool fires start/end events and runs one tool call.
+func (e *ToolExecutor) executeSingleTool(ctx context.Context, turnID string, call ToolCall) (ToolExecutionResult, error) {
+	startedAt := time.Now()
+	if e.eventHandler != nil {
+		if err := e.eventHandler.HandleToolCallStart(ctx, ToolCallEvent{
+			TurnID:    turnID,
+			ToolCall:  call,
+			StartedAt: startedAt,
+		}); err != nil {
+			return ToolExecutionResult{}, fmt.Errorf("handling tool call start: %w", err)
+		}
+	}
+	result, execErr := e.ExecuteTool(ctx, call)
+	endedAt := time.Now()
+	if execErr != nil {
+		result = ToolResult{ToolCallID: call.ID, Content: formatToolError(execErr)}
+	}
+	if e.eventHandler != nil {
+		if err := e.eventHandler.HandleToolCallEnd(ctx, ToolCallEndEvent{
+			TurnID:    turnID,
+			ToolCall:  call,
+			Result:    result,
+			StartedAt: startedAt,
+			EndedAt:   endedAt,
+		}); err != nil {
+			return ToolExecutionResult{}, fmt.Errorf("handling tool call end: %w", err)
+		}
+	}
+	return ToolExecutionResult{
+		Message: Message{
+			Role:        RoleTool,
+			ToolCalls:   []ToolCall{call},
+			ToolResults: []ToolResult{result},
+			TurnID:      turnID,
+		},
+		StartedAt: startedAt,
+		EndedAt:   endedAt,
+	}, nil
 }
 
 func (e *ToolExecutor) executeParallel(ctx context.Context, turnID string, calls []ToolCall) ([]ToolExecutionResult, error) {

@@ -179,14 +179,14 @@ func TestBuildAllowedPaths_WithoutOAuth(t *testing.T) {
 	if !paths["/mcp"] || !paths["/sse"] {
 		t.Error("expected /mcp and /sse to be allowed")
 	}
-	if paths["/authorize"] {
+	if paths[authorizeEndpointPath] {
 		t.Error("expected /authorize to be disallowed without OAuth")
 	}
 }
 
 func TestBuildAllowedPaths_WithOAuth(t *testing.T) {
 	paths := buildAllowedPaths(true)
-	expected := []string{"/mcp", "/sse", "/.well-known/oauth-protected-resource", "/authorize", "/token"}
+	expected := []string{"/mcp", "/sse", "/.well-known/oauth-protected-resource", authorizeEndpointPath, tokenEndpointPath}
 	for _, p := range expected {
 		if !paths[p] {
 			t.Errorf("expected %q to be allowed with OAuth", p)
