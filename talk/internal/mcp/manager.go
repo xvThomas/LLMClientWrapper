@@ -22,7 +22,10 @@ import (
 	"github.com/xvThomas/talk-backend/talk/internal/domain"
 )
 
-const connectTimeout = 15 * time.Second
+const (
+	connectTimeout     = 15 * time.Second
+	logMsgMCPReconnect = "mcp reconnect"
+)
 
 // ServerStatus holds the runtime state of a connected MCP server.
 type ServerStatus struct {
@@ -130,7 +133,7 @@ func (m *Manager) reconnect(ctx context.Context, cfg ServerConfig) (*mcp.ClientS
 		reconnectID := m.nextReconnectID(cfg.ID)
 		startedAt := time.Now()
 
-		m.log.Info("mcp reconnect",
+		m.log.Info(logMsgMCPReconnect,
 			"reconnect_event", "attempt",
 			"outcome", "attempt",
 			"correlation_id", reconnectID,
@@ -141,7 +144,7 @@ func (m *Manager) reconnect(ctx context.Context, cfg ServerConfig) (*mcp.ClientS
 
 		status, session, tools, _ := m.connectServer(ctx, cfg)
 		if status.Error != "" {
-			m.log.Error("mcp reconnect",
+			m.log.Error(logMsgMCPReconnect,
 				"reconnect_event", "result",
 				"outcome", "failure",
 				"correlation_id", reconnectID,
@@ -165,7 +168,7 @@ func (m *Manager) reconnect(ctx context.Context, cfg ServerConfig) (*mcp.ClientS
 		}
 
 		m.storeConnectionState(cfg, status, session, tools)
-		m.log.Info("mcp reconnect",
+		m.log.Info(logMsgMCPReconnect,
 			"reconnect_event", "result",
 			"outcome", "success",
 			"correlation_id", reconnectID,

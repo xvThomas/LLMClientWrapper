@@ -50,7 +50,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if done := h.handleResume(w, r, &input); done {
+	if h.handleResume(w, r, &input) {
 		return
 	}
 
@@ -184,7 +184,7 @@ func (h *Handler) streamChat(w http.ResponseWriter, r *http.Request, input types
 	}
 
 	if h.chatFn != nil {
-		if done := h.runChat(ctx, sse, input, threadID, runID, modelAlias, thinkingEffort); done {
+		if h.runChat(ctx, sse, input, threadID, runID, modelAlias, thinkingEffort) {
 			return
 		}
 	}

@@ -64,19 +64,19 @@ func TestParseLangfuseBaseURL(t *testing.T) {
 func TestParseConsoleUsageReporter(t *testing.T) {
 	trueValues := []string{"", "true", "1", "yes", "True", "TRUE", "Yes", "YES"}
 	for _, input := range trueValues {
-		if got := parseConsoleUsageReporter(input); !got {
+		if !parseConsoleUsageReporter(input) {
 			t.Fatalf("parseConsoleUsageReporter(%q) = false, want true", input)
 		}
 	}
 
 	falseValues := []string{"false", "0", "no", "False", "FALSE", "No", "NO"}
 	for _, input := range falseValues {
-		if got := parseConsoleUsageReporter(input); got {
+		if parseConsoleUsageReporter(input) {
 			t.Fatalf("parseConsoleUsageReporter(%q) = true, want false", input)
 		}
 	}
 
-	if got := parseConsoleUsageReporter("invalid"); !got {
+	if !parseConsoleUsageReporter("invalid") {
 		t.Fatalf("parseConsoleUsageReporter invalid = false, want true")
 	}
 }

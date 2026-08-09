@@ -10,6 +10,8 @@ import (
 	"github.com/xvThomas/talk-backend/talk/internal/mcp"
 )
 
+const cancelled = "Cancelled."
+
 func (a *App) cmdMCP(ctx context.Context, args string) {
 	parts := strings.Fields(args)
 	if len(parts) == 0 {
@@ -64,21 +66,21 @@ func (a *App) cmdMCPList() {
 func (a *App) cmdMCPAdd(ctx context.Context) {
 	name, err := a.LR.ReadLine("Server name: ")
 	if err != nil || strings.TrimSpace(name) == "" {
-		a.Println(yellow("Cancelled."))
+		a.Println(yellow(cancelled))
 		return
 	}
 	name = strings.TrimSpace(name)
 
 	url, err := a.LR.ReadLine("Server URL: ")
 	if err != nil || strings.TrimSpace(url) == "" {
-		a.Println(yellow("Cancelled."))
+		a.Println(yellow(cancelled))
 		return
 	}
 	url = strings.TrimSpace(url)
 
 	authChoice, err := a.LR.ReadLine("Auth type [none/apikey/oauth] (default: apikey): ")
 	if err != nil {
-		a.Println(yellow("Cancelled."))
+		a.Println(yellow(cancelled))
 		return
 	}
 	authChoice = strings.TrimSpace(strings.ToLower(authChoice))
@@ -99,7 +101,7 @@ func (a *App) cmdMCPAdd(ctx context.Context) {
 	case mcp.AuthTypeAPIKey:
 		key, err := a.LR.ReadLine("API Key: ")
 		if err != nil {
-			a.Println(yellow("Cancelled."))
+			a.Println(yellow(cancelled))
 			return
 		}
 		cfg.APIKey = strings.TrimSpace(key)

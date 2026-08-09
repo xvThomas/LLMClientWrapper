@@ -197,7 +197,7 @@ func (h *MessageEventHandlers) runPhases(call func(handler MessageEventHandler) 
 			h := handler
 			wg.Go(func() {
 				defer func() {
-					if panicErr := recover(); panicErr != nil {
+					if recover() != nil {
 						mu.Lock()
 						err = errors.Join(err, errors.New("message event handler panic"))
 						mu.Unlock()

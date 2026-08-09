@@ -9,6 +9,12 @@ import (
 	"github.com/xvThomas/talk-backend/talk/internal/domain"
 )
 
+const (
+	fmtErrLine  = "%s%s\n"
+	errPrefix   = "Error: "
+	labelUntitled = "(untitled)"
+)
+
 func (a *App) cmdSession(ctx context.Context, args string) {
 	parts := strings.Fields(args)
 	if len(parts) == 0 {
@@ -41,7 +47,7 @@ func (a *App) cmdSessionNew(_ context.Context) {
 func (a *App) cmdSessionList(ctx context.Context) {
 	sessions, err := a.Sessions.ListSessions(ctx, a.Scope.UserID())
 	if err != nil {
-		a.Errorf("%s%s\n", red("Error: "), err.Error())
+		a.Errorf(fmtErrLine, red(errPrefix), err.Error())
 		return
 	}
 
@@ -58,7 +64,7 @@ func (a *App) cmdSessionList(ctx context.Context) {
 		}
 		title := s.Title
 		if title == "" {
-			title = "(untitled)"
+			title = labelUntitled
 		}
 		a.Printf("  [%d] %s  %s  %s%s\n",
 			i+1,
@@ -89,7 +95,7 @@ func (a *App) cmdSessionList(ctx context.Context) {
 	}
 	title := sessions[n-1].Title
 	if title == "" {
-		title = "(untitled)"
+		title = labelUntitled
 	}
 	a.Printf("Switched to session %s.\n", green(title))
 }
@@ -97,7 +103,7 @@ func (a *App) cmdSessionList(ctx context.Context) {
 func (a *App) cmdSessionRemove(ctx context.Context) {
 	sessions, err := a.Sessions.ListSessions(ctx, a.Scope.UserID())
 	if err != nil {
-		a.Errorf("%s%s\n", red("Error: "), err.Error())
+		a.Errorf(fmtErrLine, red(errPrefix), err.Error())
 		return
 	}
 	if len(sessions) == 0 {
@@ -113,7 +119,7 @@ func (a *App) cmdSessionRemove(ctx context.Context) {
 		}
 		title := s.Title
 		if title == "" {
-			title = "(untitled)"
+			title = labelUntitled
 		}
 		a.Printf("  [%d] %s  %s  %s%s\n",
 			i+1,
@@ -140,12 +146,12 @@ func (a *App) cmdSessionRemove(ctx context.Context) {
 	}
 
 	if err := a.Sessions.DeleteSession(ctx, selected.ID); err != nil {
-		a.Errorf("%s%s\n", red("Error removing session: "), err.Error())
+		a.Errorf(fmtErrLine, red("Error removing session: "), err.Error())
 		return
 	}
 	title := selected.Title
 	if title == "" {
-		title = "(untitled)"
+		title = labelUntitled
 	}
 	a.Printf("Removed session %s.\n", green(title))
 }
@@ -153,7 +159,7 @@ func (a *App) cmdSessionRemove(ctx context.Context) {
 func (a *App) cmdMemory(ctx context.Context) {
 	turns, err := a.Sessions.LoadHistoryTurnsFromSession(ctx, a.Scope.SessionID())
 	if err != nil {
-		a.Errorf("%s%s\n", red("Error: "), err.Error())
+		a.Errorf(fmtErrLine, red(errPrefix), err.Error())
 		return
 	}
 	if len(turns) == 0 {
