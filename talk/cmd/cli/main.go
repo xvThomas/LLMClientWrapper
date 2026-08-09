@@ -5,12 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-
-	_ "net/http/pprof"
 
 	"github.com/xvThomas/talk-backend/talk-libs/version"
 	"github.com/xvThomas/talk-backend/talk/internal/config"
@@ -47,7 +44,7 @@ func newRootCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&modelFlag, "model", "", "Model alias to use (e.g. sonnet-4.6, devstral)")
 	cmd.Flags().StringVar(&systemFileFlag, "system-file", defaultSystemPromptPath(), "Path to a Markdown system prompt file")
-	cmd.Flags().BoolVar(&pprofFlag, "pprof", false, "Enable pprof profiling server on localhost:6060")
+	registerPprofFlag(cmd, &pprofFlag)
 
 	_ = cmd.MarkFlagRequired("model")
 
@@ -56,10 +53,8 @@ func newRootCmd() *cobra.Command {
 	return cmd
 }
 
-func run(ctx context.Context, modelAlias, systemFile string, pprof bool) error {
-	if pprof {
-		go http.ListenAndServe("localhost:6060", nil) //nolint:errcheck,gosec // pprof dev-only server
-	}
+func run(ctx context.Context, modelAlias, systemFile string, pprofEnabled bool) error {
+	startPprofIfEnabled(pprofEnabled)
 
 	cfg, err := config.Load(".env")
 	if err != nil {
