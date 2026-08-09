@@ -94,7 +94,7 @@ func (gr *GoPromptReader) ReadLine(promptText string) (string, error) {
 	}
 
 	p := prompt.New(
-		func(string) {},
+		func(string) {}, // callback for when user input is received
 		gr.complete,
 		prompt.OptionPrefix(stripANSI(promptText)),
 		prompt.OptionHistory(gr.historyEntries),
