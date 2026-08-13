@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xvThomas/talk-backend/talk-libs/logger"
+	"github.com/pixime-net/talkbackend/talk-libs/logger"
 	"golang.org/x/time/rate"
 )
 

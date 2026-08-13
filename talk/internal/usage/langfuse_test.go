@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xvThomas/talk-backend/talk/internal/domain"
+	"github.com/pixime-net/talkbackend/talk/internal/domain"
 )
 
 func TestNewLangfuseUsageReporter_DefaultsAndAuthHeader(t *testing.T) {

@@ -260,7 +260,7 @@ Prompts give LLM clients pre-defined instructions on how to use your tools. Crea
 ```go
 package prompts
 
-import "github.com/xvThomas/talk-backend/talk-libs/mcpserver"
+import "github.com/pixime-net/talkbackend/talk-libs/mcpserver"
 
 var MyPrompt = mcpserver.Prompt{
     Name:        "my_prompt",

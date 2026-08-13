@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/xvThomas/talk-backend/talk/internal/mcp"
+	"github.com/pixime-net/talkbackend/talk/internal/mcp"
 )
 
 const cancelled = "Cancelled."

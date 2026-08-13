@@ -14,13 +14,13 @@ import (
 
 	"github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/types"
 	"github.com/spf13/cobra"
-	"github.com/xvThomas/talk-backend/talk-libs/logger"
-	"github.com/xvThomas/talk-backend/talk/internal/agui"
-	"github.com/xvThomas/talk-backend/talk/internal/config"
-	"github.com/xvThomas/talk-backend/talk/internal/domain"
-	"github.com/xvThomas/talk-backend/talk/internal/llm/router"
-	"github.com/xvThomas/talk-backend/talk/internal/mcp"
-	sqlitestore "github.com/xvThomas/talk-backend/talk/internal/memory/sqlite"
+	"github.com/pixime-net/talkbackend/talk-libs/logger"
+	"github.com/pixime-net/talkbackend/talk/internal/agui"
+	"github.com/pixime-net/talkbackend/talk/internal/config"
+	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talkbackend/talk/internal/llm/router"
+	"github.com/pixime-net/talkbackend/talk/internal/mcp"
+	sqlitestore "github.com/pixime-net/talkbackend/talk/internal/memory/sqlite"
 )
 
 const defaultServePort = "8090"

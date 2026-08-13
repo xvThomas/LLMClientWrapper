@@ -3,12 +3,12 @@ package main
 import (
 	"os"
 
-	"github.com/xvThomas/talk-backend/mcp-playground/internal/config"
-	"github.com/xvThomas/talk-backend/mcp-playground/internal/prompts"
-	"github.com/xvThomas/talk-backend/mcp-playground/internal/tools"
-	"github.com/xvThomas/talk-backend/talk-libs/logger"
-	"github.com/xvThomas/talk-backend/talk-libs/mcpserver"
-	"github.com/xvThomas/talk-backend/talk-libs/version"
+	"github.com/pixime-net/talkbackend/mcp-playground/internal/config"
+	"github.com/pixime-net/talkbackend/mcp-playground/internal/prompts"
+	"github.com/pixime-net/talkbackend/mcp-playground/internal/tools"
+	"github.com/pixime-net/talkbackend/talk-libs/logger"
+	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
+	"github.com/pixime-net/talkbackend/talk-libs/version"
 )
 
 func main() {

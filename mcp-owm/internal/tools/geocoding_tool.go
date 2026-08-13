@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/xvThomas/talk-backend/mcp-owm/internal/ratelimit"
-	"github.com/xvThomas/talk-backend/talk-libs/mcpserver"
+	"github.com/pixime-net/talkbackend/mcp-owm/internal/ratelimit"
+	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
 )
 
 const defaultGeoBaseURL = "http://api.openweathermap.org/geo/1.0"

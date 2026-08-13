@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/xvThomas/talk-backend/mcp-owm/internal/config"
+	"github.com/pixime-net/talkbackend/mcp-owm/internal/config"
 )
 
 func TestBuildApp_FreePlan(t *testing.T) {

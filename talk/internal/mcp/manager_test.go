@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/xvThomas/talk-backend/talk/internal/domain"
+	"github.com/pixime-net/talkbackend/talk/internal/domain"
 )
 
 // mcpTool constructs an mcp.Tool for testing.

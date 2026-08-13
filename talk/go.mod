@@ -1,4 +1,4 @@
-module github.com/xvThomas/talk-backend/talk
+module github.com/pixime-net/talkbackend/talk
 
 go 1.25.0
 
@@ -11,7 +11,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.6.0
 	github.com/openai/openai-go v1.12.0
 	github.com/spf13/cobra v1.10.2
-	github.com/xvThomas/talk-backend/talk-libs v0.0.0
+	github.com/pixime-net/talkbackend/talk-libs v0.0.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.41.0
 	modernc.org/sqlite v1.50.1
@@ -45,4 +45,4 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace github.com/xvThomas/talk-backend/talk-libs => ../talk-libs
+replace github.com/pixime-net/talkbackend/talk-libs => ../talk-libs

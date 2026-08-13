@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/xvThomas/talk-backend/talk-libs/mcpserver"
+	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
 	"golang.org/x/time/rate"
 )
 

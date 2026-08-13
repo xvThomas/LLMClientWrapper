@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/types"
-	"github.com/xvThomas/talk-backend/talk/internal/config"
-	"github.com/xvThomas/talk-backend/talk/internal/domain"
-	"github.com/xvThomas/talk-backend/talk/internal/mcp"
-	sqlitestore "github.com/xvThomas/talk-backend/talk/internal/memory/sqlite"
+	"github.com/pixime-net/talkbackend/talk/internal/config"
+	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talkbackend/talk/internal/mcp"
+	sqlitestore "github.com/pixime-net/talkbackend/talk/internal/memory/sqlite"
 )
 
 func TestResolvePort(t *testing.T) {

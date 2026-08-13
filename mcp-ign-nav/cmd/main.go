@@ -3,11 +3,11 @@ package main
 import (
 	"os"
 
-	"github.com/xvThomas/talk-backend/mcp-ign-nav/internal/config"
-	"github.com/xvThomas/talk-backend/mcp-ign-nav/internal/tools"
-	"github.com/xvThomas/talk-backend/talk-libs/logger"
-	"github.com/xvThomas/talk-backend/talk-libs/mcpserver"
-	"github.com/xvThomas/talk-backend/talk-libs/version"
+	"github.com/pixime-net/talkbackend/mcp-ign-nav/internal/config"
+	"github.com/pixime-net/talkbackend/mcp-ign-nav/internal/tools"
+	"github.com/pixime-net/talkbackend/talk-libs/logger"
+	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
+	"github.com/pixime-net/talkbackend/talk-libs/version"
 	"golang.org/x/time/rate"
 )
 

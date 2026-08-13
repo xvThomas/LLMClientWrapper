@@ -9,14 +9,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/xvThomas/talk-backend/talk-libs/version"
-	"github.com/xvThomas/talk-backend/talk/internal/config"
-	"github.com/xvThomas/talk-backend/talk/internal/domain"
-	"github.com/xvThomas/talk-backend/talk/internal/llm/router"
-	"github.com/xvThomas/talk-backend/talk/internal/mcp"
-	sqlitestore "github.com/xvThomas/talk-backend/talk/internal/memory/sqlite"
-	"github.com/xvThomas/talk-backend/talk/internal/prompt"
-	"github.com/xvThomas/talk-backend/talk/internal/usage"
+	"github.com/pixime-net/talkbackend/talk-libs/version"
+	"github.com/pixime-net/talkbackend/talk/internal/config"
+	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talkbackend/talk/internal/llm/router"
+	"github.com/pixime-net/talkbackend/talk/internal/mcp"
+	sqlitestore "github.com/pixime-net/talkbackend/talk/internal/memory/sqlite"
+	"github.com/pixime-net/talkbackend/talk/internal/prompt"
+	"github.com/pixime-net/talkbackend/talk/internal/usage"
 
 	"github.com/spf13/cobra"
 )

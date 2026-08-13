@@ -1,7 +1,7 @@
 # talk-backend
 
-[![CI](https://github.com/xvThomas/talk-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/xvThomas/talk-backend/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/xvThomas/talk-backend/branch/main/graph/badge.svg)](https://codecov.io/gh/xvThomas/talk-backend)
+[![CI](https://github.com/pixime-net/talkbackend/actions/workflows/ci.yml/badge.svg)](https://github.com/pixime-net/talkbackend/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/pixime-net/talkbackend/branch/main/graph/badge.svg)](https://codecov.io/gh/pixime-net/talkbackend)
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev)
 
 A Go monorepo for LLM-powered applications: a multi-provider interactive CLI, an AG-UI protocol HTTP server, and standalone MCP (Model Context Protocol) tool servers.
@@ -43,8 +43,8 @@ go.work (root)
 ### 1. Clone and build
 
 ```bash
-git clone https://github.com/xvThomas/talk-backend.git
-cd talk-backend
+git clone https://github.com/pixime-net/talkbackend.git
+cd talkbackend
 make build
 ```
 

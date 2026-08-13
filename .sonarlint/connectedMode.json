@@ -1,5 +1,5 @@
 {
-    "sonarCloudOrganization": "xvthomas",
-    "projectKey": "xvThomas_talk-backend",
+    "sonarCloudOrganization": "pixime-net",
+    "projectKey": "pixime-net_talkbackend",
     "region": "EU"
 }

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xvThomas/talk-backend/talk/internal/mcp"
+	"github.com/pixime-net/talkbackend/talk/internal/mcp"
 )
 
 func TestHandleSlashCommand_Help(t *testing.T) {

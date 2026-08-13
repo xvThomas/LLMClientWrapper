@@ -44,7 +44,7 @@
     "uncoveredGutterStyle": "blockred"
   },
   "sonarlint.connectedMode.project": {
-    "connectionId": "xvthomas",
-    "projectKey": "xvThomas_talk-backend"
+    "connectionId": "pixime-net",
+    "projectKey": "pixime-net_talkbackend"
   }
 }

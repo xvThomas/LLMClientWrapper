@@ -1,10 +1,10 @@
-module github.com/xvThomas/talk-backend/mcp-owm
+module github.com/pixime-net/talkbackend/mcp-owm
 
 go 1.25.0
 
 require (
 	github.com/joho/godotenv v1.5.1
-	github.com/xvThomas/talk-backend/talk-libs v0.0.0
+	github.com/pixime-net/talkbackend/talk-libs v0.0.0
 )
 
 require (
@@ -19,4 +19,4 @@ require (
 	golang.org/x/time v0.15.0
 )
 
-replace github.com/xvThomas/talk-backend/talk-libs => ../talk-libs
+replace github.com/pixime-net/talkbackend/talk-libs => ../talk-libs

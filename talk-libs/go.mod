@@ -1,4 +1,4 @@
-module github.com/xvThomas/talk-backend/talk-libs
+module github.com/pixime-net/talkbackend/talk-libs
 
 go 1.25.0
 
@@ -6,6 +6,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/joho/godotenv v1.5.1
 	github.com/modelcontextprotocol/go-sdk v1.6.0
+	golang.org/x/time v0.15.0
 )
 
 require (

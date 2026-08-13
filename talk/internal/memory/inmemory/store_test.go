@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xvThomas/talk-backend/talk/internal/domain"
+	"github.com/pixime-net/talkbackend/talk/internal/domain"
 )
 
 var scope = domain.NewSessionScope("sess-1", "user1")
