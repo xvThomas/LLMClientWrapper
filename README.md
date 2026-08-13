@@ -1,7 +1,8 @@
 # talk-backend
 
-[![CI](https://github.com/pixime-net/talkbackend/actions/workflows/ci.yml/badge.svg)](https://github.com/pixime-net/talkbackend/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/pixime-net/talkbackend/branch/main/graph/badge.svg)](https://codecov.io/gh/pixime-net/talkbackend)
+[![CI](https://github.com/pixime-net/talk-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/pixime-net/talk-backend/actions/workflows/ci.yml)
+[![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=pixime-net_talk-backend&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=pixime-net_talk-backend)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=pixime-net_talk-backend&metric=coverage)](https://sonarcloud.io/summary/new_code?id=pixime-net_talk-backend)
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev)
 
 A Go monorepo for LLM-powered applications: a multi-provider interactive CLI, an AG-UI protocol HTTP server, and standalone MCP (Model Context Protocol) tool servers.
