@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -23,16 +22,14 @@ type routeParams struct {
 	GetGeometry   bool
 }
 
-// routeClient encapsulates the HTTP client and rate limiter for IGN API calls.
+// routeClient adapts the shared HTTP transport for route API calls.
 type routeClient struct {
-	baseURL string
-	http    *http.Client
-	limiter *rate.Limiter
+	*httpClient
 }
 
 // newRouteClient creates a routeClient with the given base URL and limiter.
 func newRouteClient(baseURL string, httpClient *http.Client, limiter *rate.Limiter) *routeClient {
-	return &routeClient{baseURL: baseURL, http: httpClient, limiter: limiter}
+	return &routeClient{httpClient: newHTTPClient(baseURL, httpClient, limiter)}
 }
 
 // callRouteAPI calls the IGN /itineraire endpoint with the given parameters.
@@ -46,40 +43,13 @@ func (c *routeClient) callRouteAPI(ctx context.Context, params routeParams) (*ro
 
 	body := buildRouteRequest(params)
 
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling request: %w", err)
-	}
-
-	endpoint := fmt.Sprintf("%s/itineraire", c.baseURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
-	if err != nil {
-		return nil, fmt.Errorf("building request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	if err := c.limiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter: %w", err)
-	}
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("API request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		var errResp routeErrorResponse
-		if decErr := json.NewDecoder(resp.Body).Decode(&errResp); decErr == nil && errResp.Error.Message != "" {
-			return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, errResp.Error.Message)
-		}
-		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
-	}
-
 	var result routeAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	if err := c.postJSON(ctx, "/itineraire", body, &result); err != nil {
+		var errResp routeErrorResponse
+		if decErr := json.Unmarshal([]byte(err.Error()), &errResp); decErr == nil && errResp.Error.Message != "" {
+			return nil, fmt.Errorf("API error (status %d): %s", http.StatusBadRequest, errResp.Error.Message)
+		}
+		return nil, err
 	}
 
 	return &result, nil

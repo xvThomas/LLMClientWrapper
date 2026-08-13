@@ -2,9 +2,10 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
@@ -58,25 +59,19 @@ type ReverseGeocodingToolOutput struct {
 
 // ReverseGeocodingTool implements mcpserver.MCPTool for reverse geocoding via the IGN Géoplateforme API.
 type ReverseGeocodingTool struct {
-	baseURL string
-	http    *http.Client
-	limiter *rate.Limiter
+	client *httpClient
 }
 
 var _ mcpserver.MCPTool[ReverseGeocodingToolInput, ReverseGeocodingToolOutput] = (*ReverseGeocodingTool)(nil)
 
 // NewReverseGeocodingTool creates a ReverseGeocodingTool using the IGN Géoplateforme API.
 func NewReverseGeocodingTool(limiter *rate.Limiter) *ReverseGeocodingTool {
-	return &ReverseGeocodingTool{
-		baseURL: defaultBaseURL,
-		http:    &http.Client{Timeout: httpClientTimeout},
-		limiter: limiter,
-	}
+	return &ReverseGeocodingTool{client: newHTTPClient(defaultBaseURL, &http.Client{Timeout: httpClientTimeout}, limiter)}
 }
 
 // newReverseGeocodingToolWithBaseURL creates a ReverseGeocodingTool with a custom base URL (for testing).
 func newReverseGeocodingToolWithBaseURL(baseURL string, client *http.Client) *ReverseGeocodingTool {
-	return &ReverseGeocodingTool{baseURL: baseURL, http: client, limiter: rate.NewLimiter(rate.Inf, 0)}
+	return &ReverseGeocodingTool{client: newHTTPClient(baseURL, client, rate.NewLimiter(rate.Inf, 0))}
 }
 
 // Name returns the tool name.
@@ -124,31 +119,15 @@ func (t *ReverseGeocodingTool) Call(ctx context.Context, input ReverseGeocodingT
 }
 
 func (t *ReverseGeocodingTool) reverseGeocode(ctx context.Context, coord Coordinate, index string, limit int) ([]Feature, error) {
-	endpoint := fmt.Sprintf("%s/reverse?lon=%f&lat=%f&index=%s&limit=%d",
-		t.baseURL, coord.Lon, coord.Lat, index, limit)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("building request: %w", err)
-	}
-
-	if err := t.limiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter: %w", err)
-	}
-
-	resp, err := t.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("API request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
-	}
+	params := url.Values{}
+	params.Set("lon", strconv.FormatFloat(coord.Lon, 'f', -1, 64))
+	params.Set("lat", strconv.FormatFloat(coord.Lat, 'f', -1, 64))
+	params.Set("index", index)
+	params.Set("limit", strconv.Itoa(limit))
 
 	var fc featureCollection
-	if err := json.NewDecoder(resp.Body).Decode(&fc); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	if err := t.client.getJSON(ctx, "/reverse", params, &fc); err != nil {
+		return nil, err
 	}
 
 	features := make([]Feature, 0, len(fc.Features))
