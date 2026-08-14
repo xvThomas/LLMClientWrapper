@@ -44,19 +44,7 @@ func (a *App) cmdSessionNew(_ context.Context) {
 	a.Printf("%s\n", green("✓ New session created."))
 }
 
-func (a *App) cmdSessionList(ctx context.Context) {
-	sessions, err := a.Sessions.ListSessions(ctx, a.Scope.UserID())
-	if err != nil {
-		a.Errorf(fmtErrLine, red(errPrefix), err.Error())
-		return
-	}
-
-	a.Println("\n" + emphasize("Sessions:"))
-	if len(sessions) == 0 {
-		a.Println(faint("  (no past sessions found)"))
-		return
-	}
-
+func (a *App) printSessions(sessions []domain.SessionSummary) {
 	for i, s := range sessions {
 		marker := ""
 		if s.ID == a.Scope.SessionID() {
@@ -73,6 +61,22 @@ func (a *App) cmdSessionList(ctx context.Context) {
 			title,
 			marker)
 	}
+}
+
+func (a *App) cmdSessionList(ctx context.Context) {
+	sessions, err := a.Sessions.ListSessions(ctx, a.Scope.UserID())
+	if err != nil {
+		a.Errorf(fmtErrLine, red(errPrefix), err.Error())
+		return
+	}
+
+	a.Println("\n" + emphasize("Sessions:"))
+	if len(sessions) == 0 {
+		a.Println(faint("  (no past sessions found)"))
+		return
+	}
+
+	a.printSessions(sessions)
 
 	choice, err := a.LR.ReadLine(fmt.Sprintf("Choose [1-%d] or 'new' (Enter to cancel): ", len(sessions)))
 	if err != nil || strings.TrimSpace(choice) == "" {
@@ -112,22 +116,7 @@ func (a *App) cmdSessionRemove(ctx context.Context) {
 	}
 
 	a.Println("\n" + emphasize("Sessions:"))
-	for i, s := range sessions {
-		marker := ""
-		if s.ID == a.Scope.SessionID() {
-			marker = " " + green("← current")
-		}
-		title := s.Title
-		if title == "" {
-			title = labelUntitled
-		}
-		a.Printf("  [%d] %s  %s  %s%s\n",
-			i+1,
-			faint(s.CreatedAt.Format("2006-01-02 15:04")),
-			faint(fmt.Sprintf("%d turns", s.TurnCount)),
-			title,
-			marker)
-	}
+	a.printSessions(sessions)
 
 	choice, err := a.LR.ReadLine(fmt.Sprintf("Remove [1-%d] (Enter to cancel): ", len(sessions)))
 	if err != nil || strings.TrimSpace(choice) == "" {
