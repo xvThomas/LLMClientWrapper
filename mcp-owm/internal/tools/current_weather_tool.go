@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"golang.org/x/time/rate"
 	"github.com/pixime-net/talk-libs/mcpserver"
+	"golang.org/x/time/rate"
 )
 
 const defaultBaseURL = "https://api.openweathermap.org/data/2.5"

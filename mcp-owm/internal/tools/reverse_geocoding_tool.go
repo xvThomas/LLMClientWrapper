@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"golang.org/x/time/rate"
 	"github.com/pixime-net/talk-libs/mcpserver"
+	"golang.org/x/time/rate"
 )
 
 // ReverseGeocodingToolInput is the typed input for ReverseGeocodingTool.

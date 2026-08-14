@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"golang.org/x/time/rate"
 	"github.com/pixime-net/talk-libs/mcpserver"
+	"golang.org/x/time/rate"
 )
 
 // ForecastToolInput is the typed input for Forecast5Days3HoursWeatherTool.
