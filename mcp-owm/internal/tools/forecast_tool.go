@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
-	"strconv"
-	"time"
 
 	"github.com/pixime-net/talk-libs/mcpserver"
 	"golang.org/x/time/rate"
@@ -95,53 +92,22 @@ func (t *Forecast5Days3HoursWeatherTool) Call(ctx context.Context, input Forecas
 	}
 
 	out := ForecastToolOutput{
-		City: ForecastCity{
-			Name:     response.City.Name,
-			Coord:    Coordinates{Lon: response.City.Coord.Lon, Lat: response.City.Coord.Lat},
-			Country:  response.City.Country,
-			Timezone: response.City.Timezone,
-			Sunrise:  response.City.Sunrise,
-			Sunset:   response.City.Sunset,
-		},
+		City:      buildForecastCity(response.City),
 		Count:     response.Cnt,
 		Forecasts: make([]ForecastEntry, 0, len(response.List)),
 	}
 
 	for _, item := range response.List {
-		entry := ForecastEntry{
-			DateTime:   time.Unix(item.Dt, 0).UTC().Format(time.RFC3339),
-			Temp:       item.Main.Temp,
-			FeelsLike:  item.Main.FeelsLike,
-			TempMin:    item.Main.TempMin,
-			TempMax:    item.Main.TempMax,
-			Pressure:   item.Main.Pressure,
-			Humidity:   item.Main.Humidity,
-			SeaLevel:   item.Main.SeaLevel,
-			GrndLevel:  item.Main.GrndLevel,
-			Cloudiness: item.Clouds.All,
-			WindSpeed:  item.Wind.Speed,
-			WindDeg:    item.Wind.Deg,
-			WindGust:   item.Wind.Gust,
-			Visibility: item.Visibility,
-			Pop:        item.Pop,
-		}
-
-		entry.Weather = make([]WeatherCondition, 0, len(item.Weather))
-		for _, w := range item.Weather {
-			entry.Weather = append(entry.Weather, WeatherCondition{
-				Main:        w.Main,
-				Description: w.Description,
-			})
-		}
-
+		var precipitation, snow *float64
 		if item.Rain != nil {
-			entry.Precipitation = &item.Rain.ThreeH
+			v := item.Rain.ThreeH
+			precipitation = &v
 		}
 		if item.Snow != nil {
-			entry.Snow = &item.Snow.ThreeH
+			v := item.Snow.ThreeH
+			snow = &v
 		}
-
-		out.Forecasts = append(out.Forecasts, entry)
+		out.Forecasts = append(out.Forecasts, buildForecastEntry(item.Dt, item.Main, item.Weather, item.Clouds, item.Wind, item.Visibility, item.Pop, precipitation, snow))
 	}
 
 	return out, nil
@@ -173,16 +139,8 @@ type forecastResponse struct {
 }
 
 func (t *Forecast5Days3HoursWeatherTool) fetchForecast(ctx context.Context, lat, lon float64, count int) (*forecastResponse, error) {
-	q := url.Values{
-		"lat":   {strconv.FormatFloat(lat, 'f', -1, 64)},
-		"lon":   {strconv.FormatFloat(lon, 'f', -1, 64)},
-		"units": {"metric"},
-	}
-	if count > 0 {
-		q.Set("cnt", strconv.Itoa(count))
-	}
 	var data forecastResponse
-	if err := t.client.getJSON(ctx, "/forecast", q, &data); err != nil {
+	if err := t.client.getJSON(ctx, "/forecast", buildForecastQueryParams(lat, lon, count), &data); err != nil {
 		return nil, err
 	}
 	return &data, nil
