@@ -2,9 +2,10 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/pixime-net/mcp-owm/internal/ratelimit"
@@ -62,22 +63,19 @@ type DailyForecastToolOutput struct {
 
 // DailyForecastTool implements mcpserver.MCPTool for fetching the 16-day daily forecast via OpenWeatherMap.
 type DailyForecastTool struct {
-	apiKey  string
-	baseURL string
-	http    *http.Client
-	limiter *ratelimit.Limiter
+	client *httpClient
 }
 
 // NewDailyForecastTool creates a DailyForecastTool with the given API key.
 func NewDailyForecastTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[DailyForecastToolInput, DailyForecastToolOutput] {
-	return &DailyForecastTool{apiKey: apiKey, baseURL: defaultBaseURL, http: &http.Client{}, limiter: limiter}
+	return &DailyForecastTool{client: newHTTPClient(defaultBaseURL, apiKey, nil, limiter)}
 }
 
 var _ mcpserver.MCPTool[DailyForecastToolInput, DailyForecastToolOutput] = (*DailyForecastTool)(nil)
 
 // newDailyForecastToolWithBaseURL creates a DailyForecastTool with a custom base URL (for testing).
-func newDailyForecastToolWithBaseURL(apiKey, baseURL string, client *http.Client) *DailyForecastTool {
-	return &DailyForecastTool{apiKey: apiKey, baseURL: baseURL, http: client, limiter: ratelimit.Noop()}
+func newDailyForecastToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *DailyForecastTool {
+	return &DailyForecastTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
 }
 
 // Name returns the tool name as expected by the model.
@@ -201,36 +199,17 @@ type dailyForecastResponse struct {
 }
 
 func (t *DailyForecastTool) fetchDailyForecast(ctx context.Context, lat, lon float64, count int) (*dailyForecastResponse, error) {
-	endpoint := fmt.Sprintf("%s/forecast/daily?lat=%f&lon=%f&appid=%s&units=metric",
-		t.baseURL, lat, lon, t.apiKey)
-
+	q := url.Values{
+		"lat":   {strconv.FormatFloat(lat, 'f', -1, 64)},
+		"lon":   {strconv.FormatFloat(lon, 'f', -1, 64)},
+		"units": {"metric"},
+	}
 	if count > 0 {
-		endpoint += fmt.Sprintf("&cnt=%d", count)
+		q.Set("cnt", strconv.Itoa(count))
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("building daily forecast request: %w", err)
-	}
-
-	if err := t.limiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter: %w", err)
-	}
-
-	resp, err := t.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("daily forecast API request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("daily forecast API returned status %d", resp.StatusCode)
-	}
-
 	var data dailyForecastResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("decoding daily forecast response: %w", err)
+	if err := t.client.getJSON(ctx, "/forecast/daily", q, &data); err != nil {
+		return nil, err
 	}
-
 	return &data, nil
 }

@@ -2,9 +2,10 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/pixime-net/mcp-owm/internal/ratelimit"
@@ -29,22 +30,19 @@ type HourlyForecastToolOutput struct {
 
 // HourlyForecastTool implements mcpserver.MCPTool for fetching 4-day hourly forecast via OpenWeatherMap Pro.
 type HourlyForecastTool struct {
-	apiKey  string
-	baseURL string
-	http    *http.Client
-	limiter *ratelimit.Limiter
+	client *httpClient
 }
 
 // NewHourlyForecastTool creates a HourlyForecastTool with the given API key.
 func NewHourlyForecastTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[HourlyForecastToolInput, HourlyForecastToolOutput] {
-	return &HourlyForecastTool{apiKey: apiKey, baseURL: defaultProBaseURL, http: &http.Client{}, limiter: limiter}
+	return &HourlyForecastTool{client: newHTTPClient(defaultProBaseURL, apiKey, nil, limiter)}
 }
 
 var _ mcpserver.MCPTool[HourlyForecastToolInput, HourlyForecastToolOutput] = (*HourlyForecastTool)(nil)
 
 // newHourlyForecastToolWithBaseURL creates a HourlyForecastTool with a custom base URL (for testing).
-func newHourlyForecastToolWithBaseURL(apiKey, baseURL string, client *http.Client) *HourlyForecastTool {
-	return &HourlyForecastTool{apiKey: apiKey, baseURL: baseURL, http: client, limiter: ratelimit.Noop()}
+func newHourlyForecastToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *HourlyForecastTool {
+	return &HourlyForecastTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
 }
 
 // Name returns the tool name as expected by the model.
@@ -145,36 +143,17 @@ type hourlyForecastResponse struct {
 }
 
 func (t *HourlyForecastTool) fetchHourlyForecast(ctx context.Context, lat, lon float64, count int) (*hourlyForecastResponse, error) {
-	endpoint := fmt.Sprintf("%s/forecast/hourly?lat=%f&lon=%f&appid=%s&units=metric",
-		t.baseURL, lat, lon, t.apiKey)
-
+	q := url.Values{
+		"lat":   {strconv.FormatFloat(lat, 'f', -1, 64)},
+		"lon":   {strconv.FormatFloat(lon, 'f', -1, 64)},
+		"units": {"metric"},
+	}
 	if count > 0 {
-		endpoint += fmt.Sprintf("&cnt=%d", count)
+		q.Set("cnt", strconv.Itoa(count))
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("building hourly forecast request: %w", err)
-	}
-
-	if err := t.limiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter: %w", err)
-	}
-
-	resp, err := t.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("hourly forecast API request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("hourly forecast API returned status %d", resp.StatusCode)
-	}
-
 	var data hourlyForecastResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("decoding hourly forecast response: %w", err)
+	if err := t.client.getJSON(ctx, "/forecast/hourly", q, &data); err != nil {
+		return nil, err
 	}
-
 	return &data, nil
 }

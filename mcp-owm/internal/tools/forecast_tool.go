@@ -2,9 +2,10 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/pixime-net/mcp-owm/internal/ratelimit"
@@ -59,22 +60,19 @@ type ForecastToolOutput struct {
 
 // Forecast5Days3HoursWeatherTool implements mcpserver.MCPTool for fetching 5-day/3-hour forecast via OpenWeatherMap.
 type Forecast5Days3HoursWeatherTool struct {
-	apiKey  string
-	baseURL string
-	http    *http.Client
-	limiter *ratelimit.Limiter
+	client *httpClient
 }
 
 // NewForecast5Days3HoursWeatherTool creates a Forecast5Days3HoursWeatherTool with the given API key.
 func NewForecast5Days3HoursWeatherTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[ForecastToolInput, ForecastToolOutput] {
-	return &Forecast5Days3HoursWeatherTool{apiKey: apiKey, baseURL: defaultBaseURL, http: &http.Client{}, limiter: limiter}
+	return &Forecast5Days3HoursWeatherTool{client: newHTTPClient(defaultBaseURL, apiKey, nil, limiter)}
 }
 
 var _ mcpserver.MCPTool[ForecastToolInput, ForecastToolOutput] = (*Forecast5Days3HoursWeatherTool)(nil)
 
 // newForecast5Days3HoursWeatherToolWithBaseURL creates a Forecast5Days3HoursWeatherTool with a custom base URL (for testing).
-func newForecast5Days3HoursWeatherToolWithBaseURL(apiKey, baseURL string, client *http.Client) *Forecast5Days3HoursWeatherTool {
-	return &Forecast5Days3HoursWeatherTool{apiKey: apiKey, baseURL: baseURL, http: client, limiter: ratelimit.Noop()}
+func newForecast5Days3HoursWeatherToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *Forecast5Days3HoursWeatherTool {
+	return &Forecast5Days3HoursWeatherTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
 }
 
 // Name returns the tool name as expected by the model.
@@ -175,35 +173,17 @@ type forecastResponse struct {
 }
 
 func (t *Forecast5Days3HoursWeatherTool) fetchForecast(ctx context.Context, lat, lon float64, count int) (*forecastResponse, error) {
-	endpoint := fmt.Sprintf("%s/forecast?lat=%f&lon=%f&appid=%s&units=metric",
-		t.baseURL, lat, lon, t.apiKey)
-
+	q := url.Values{
+		"lat":   {strconv.FormatFloat(lat, 'f', -1, 64)},
+		"lon":   {strconv.FormatFloat(lon, 'f', -1, 64)},
+		"units": {"metric"},
+	}
 	if count > 0 {
-		endpoint += fmt.Sprintf("&cnt=%d", count)
+		q.Set("cnt", strconv.Itoa(count))
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("building forecast request: %w", err)
-	}
-
-	if err := t.limiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter: %w", err)
-	}
-
-	resp, err := t.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("forecast API request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("forecast API returned status %d", resp.StatusCode)
-	}
-
 	var data forecastResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("decoding forecast response: %w", err)
+	if err := t.client.getJSON(ctx, "/forecast", q, &data); err != nil {
+		return nil, err
 	}
 	return &data, nil
 }

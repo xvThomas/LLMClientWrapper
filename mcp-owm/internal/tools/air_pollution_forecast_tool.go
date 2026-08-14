@@ -2,9 +2,10 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/pixime-net/mcp-owm/internal/ratelimit"
@@ -31,22 +32,19 @@ type AirPollutionForecastToolOutput struct {
 
 // AirPollutionForecastTool implements mcpserver.MCPTool for fetching air pollution forecast data via OpenWeatherMap.
 type AirPollutionForecastTool struct {
-	apiKey  string
-	baseURL string
-	http    *http.Client
-	limiter *ratelimit.Limiter
+	client *httpClient
 }
 
 // NewAirPollutionForecastTool creates an AirPollutionForecastTool with the given API key.
 func NewAirPollutionForecastTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[AirPollutionForecastToolInput, AirPollutionForecastToolOutput] {
-	return &AirPollutionForecastTool{apiKey: apiKey, baseURL: defaultBaseURL, http: &http.Client{}, limiter: limiter}
+	return &AirPollutionForecastTool{client: newHTTPClient(defaultBaseURL, apiKey, nil, limiter)}
 }
 
 var _ mcpserver.MCPTool[AirPollutionForecastToolInput, AirPollutionForecastToolOutput] = (*AirPollutionForecastTool)(nil)
 
 // newAirPollutionForecastToolWithBaseURL creates an AirPollutionForecastTool with a custom base URL (for testing).
-func newAirPollutionForecastToolWithBaseURL(apiKey, baseURL string, client *http.Client) *AirPollutionForecastTool {
-	return &AirPollutionForecastTool{apiKey: apiKey, baseURL: baseURL, http: client, limiter: ratelimit.Noop()}
+func newAirPollutionForecastToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *AirPollutionForecastTool {
+	return &AirPollutionForecastTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
 }
 
 // Name returns the tool name as expected by the model.
@@ -94,32 +92,13 @@ func (t *AirPollutionForecastTool) Call(ctx context.Context, input AirPollutionF
 }
 
 func (t *AirPollutionForecastTool) fetchForecast(ctx context.Context, lat, lon float64) (*airPollutionResponse, error) {
-	endpoint := fmt.Sprintf("%s/air_pollution/forecast?lat=%f&lon=%f&appid=%s",
-		t.baseURL, lat, lon, t.apiKey)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("building air pollution forecast request: %w", err)
+	q := url.Values{
+		"lat": {strconv.FormatFloat(lat, 'f', -1, 64)},
+		"lon": {strconv.FormatFloat(lon, 'f', -1, 64)},
 	}
-
-	if err := t.limiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter: %w", err)
-	}
-
-	resp, err := t.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("air pollution forecast API request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("air pollution forecast API returned status %d", resp.StatusCode)
-	}
-
 	var data airPollutionResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("decoding air pollution forecast response: %w", err)
+	if err := t.client.getJSON(ctx, "/air_pollution/forecast", q, &data); err != nil {
+		return nil, err
 	}
-
 	return &data, nil
 }

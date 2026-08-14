@@ -2,10 +2,10 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/pixime-net/mcp-owm/internal/ratelimit"
 	"github.com/pixime-net/talk-libs/mcpserver"
@@ -35,22 +35,19 @@ type GeocodingToolOutput struct {
 
 // GeocodingTool implements mcpserver.MCPTool for direct geocoding via OpenWeatherMap.
 type GeocodingTool struct {
-	apiKey  string
-	baseURL string
-	http    *http.Client
-	limiter *ratelimit.Limiter
+	client *httpClient
 }
 
 // NewGeocodingTool creates a GeocodingTool with the given API key.
 func NewGeocodingTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[GeocodingToolInput, GeocodingToolOutput] {
-	return &GeocodingTool{apiKey: apiKey, baseURL: defaultGeoBaseURL, http: &http.Client{}, limiter: limiter}
+	return &GeocodingTool{client: newHTTPClient(defaultGeoBaseURL, apiKey, nil, limiter)}
 }
 
 var _ mcpserver.MCPTool[GeocodingToolInput, GeocodingToolOutput] = (*GeocodingTool)(nil)
 
 // newGeocodingToolWithBaseURL creates a GeocodingTool with a custom base URL (for testing).
-func newGeocodingToolWithBaseURL(apiKey, baseURL string, client *http.Client) *GeocodingTool {
-	return &GeocodingTool{apiKey: apiKey, baseURL: baseURL, http: client, limiter: ratelimit.Noop()}
+func newGeocodingToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *GeocodingTool {
+	return &GeocodingTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
 }
 
 // Name returns the tool name as expected by the model.
@@ -72,31 +69,10 @@ func (t *GeocodingTool) Call(ctx context.Context, input GeocodingToolInput) (Geo
 		limit = 5
 	}
 
-	endpoint := fmt.Sprintf("%s/direct?q=%s&limit=%d&appid=%s",
-		t.baseURL, url.QueryEscape(input.City), limit, t.apiKey)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return GeocodingToolOutput{}, fmt.Errorf("building geocoding request: %w", err)
-	}
-
-	if err := t.limiter.Wait(ctx); err != nil {
-		return GeocodingToolOutput{}, fmt.Errorf("rate limiter: %w", err)
-	}
-
-	resp, err := t.http.Do(req)
-	if err != nil {
-		return GeocodingToolOutput{}, fmt.Errorf("geocoding API request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return GeocodingToolOutput{}, fmt.Errorf("geocoding API returned status %d", resp.StatusCode)
-	}
-
+	q := url.Values{"q": {input.City}, "limit": {strconv.Itoa(limit)}}
 	var results []geocodingResponse
-	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
-		return GeocodingToolOutput{}, fmt.Errorf("decoding geocoding response: %w", err)
+	if err := t.client.getJSON(ctx, "/direct", q, &results); err != nil {
+		return GeocodingToolOutput{}, err
 	}
 
 	out := GeocodingToolOutput{
