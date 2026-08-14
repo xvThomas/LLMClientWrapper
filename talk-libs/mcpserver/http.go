@@ -11,7 +11,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/pixime-net/talkbackend/talk-libs/logger"
+	"github.com/pixime-net/talk-libs/logger"
 )
 
 func (a *App) runHTTP(addr string) {

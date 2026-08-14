@@ -3,10 +3,10 @@ package router
 import (
 	"fmt"
 
-	"github.com/pixime-net/talkbackend/talk/internal/config"
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
-	"github.com/pixime-net/talkbackend/talk/internal/llm/anthropic"
-	"github.com/pixime-net/talkbackend/talk/internal/llm/openai"
+	"github.com/pixime-net/talk/internal/config"
+	"github.com/pixime-net/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/llm/anthropic"
+	"github.com/pixime-net/talk/internal/llm/openai"
 )
 
 // Router builds LlmClient instances for model aliases from configuration.

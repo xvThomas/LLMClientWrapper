@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pixime-net/talkbackend/mcp-owm/internal/ratelimit"
+	"github.com/pixime-net/mcp-owm/internal/ratelimit"
 
-	"github.com/pixime-net/talkbackend/talk-libs/testutils"
+	"github.com/pixime-net/talk-libs/testutils"
 
 	"github.com/joho/godotenv"
 )

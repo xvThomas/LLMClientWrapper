@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/domain"
 )
 
 // OpenTelemetry OTLP structures following the standard specification

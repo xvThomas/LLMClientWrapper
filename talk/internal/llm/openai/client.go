@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/domain"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"

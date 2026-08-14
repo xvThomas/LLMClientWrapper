@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pixime-net/talkbackend/mcp-owm/internal/ratelimit"
-	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
+	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
 // ForecastToolInput is the typed input for Forecast5Days3HoursWeatherTool.

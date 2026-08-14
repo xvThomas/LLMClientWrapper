@@ -4,7 +4,7 @@ APP_NAME     := talk-cli
 BINARY       := bin/$(APP_NAME)
 CMD          := ./cmd/cli
 VERSION      := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS      := -ldflags "-X github.com/pixime-net/talkbackend/talk-libs/version.Version=$(VERSION)"
+LDFLAGS      := -ldflags "-X github.com/pixime-net/talk-backend/talk-libs/version.Version=$(VERSION)"
 
 .PHONY: all build run test cover vet clean help
 

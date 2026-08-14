@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pixime-net/talkbackend/mcp-owm/internal/ratelimit"
-	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
+	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
 // AirPollutionToolInput is the typed input for AirPollutionTool.

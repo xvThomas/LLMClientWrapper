@@ -3,13 +3,13 @@ package main
 import (
 	"os"
 
-	"github.com/pixime-net/talkbackend/mcp-owm/internal/config"
-	"github.com/pixime-net/talkbackend/mcp-owm/internal/prompts"
-	"github.com/pixime-net/talkbackend/mcp-owm/internal/ratelimit"
-	"github.com/pixime-net/talkbackend/mcp-owm/internal/tools"
-	"github.com/pixime-net/talkbackend/talk-libs/logger"
-	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
-	"github.com/pixime-net/talkbackend/talk-libs/version"
+	"github.com/pixime-net/mcp-owm/internal/config"
+	"github.com/pixime-net/mcp-owm/internal/prompts"
+	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"github.com/pixime-net/mcp-owm/internal/tools"
+	"github.com/pixime-net/talk-libs/logger"
+	"github.com/pixime-net/talk-libs/mcpserver"
+	"github.com/pixime-net/talk-libs/version"
 )
 
 func main() {

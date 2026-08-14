@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/domain"
 
 	"github.com/anthropics/anthropic-sdk-go"
 )

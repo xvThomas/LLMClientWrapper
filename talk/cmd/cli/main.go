@@ -9,14 +9,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pixime-net/talkbackend/talk-libs/version"
-	"github.com/pixime-net/talkbackend/talk/internal/config"
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
-	"github.com/pixime-net/talkbackend/talk/internal/llm/router"
-	"github.com/pixime-net/talkbackend/talk/internal/mcp"
-	sqlitestore "github.com/pixime-net/talkbackend/talk/internal/memory/sqlite"
-	"github.com/pixime-net/talkbackend/talk/internal/prompt"
-	"github.com/pixime-net/talkbackend/talk/internal/usage"
+	"github.com/pixime-net/talk-libs/version"
+	"github.com/pixime-net/talk/internal/config"
+	"github.com/pixime-net/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/llm/router"
+	"github.com/pixime-net/talk/internal/mcp"
+	sqlitestore "github.com/pixime-net/talk/internal/memory/sqlite"
+	"github.com/pixime-net/talk/internal/prompt"
+	"github.com/pixime-net/talk/internal/usage"
 
 	"github.com/spf13/cobra"
 )

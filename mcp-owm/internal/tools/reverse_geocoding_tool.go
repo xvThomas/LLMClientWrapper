@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/pixime-net/talkbackend/mcp-owm/internal/ratelimit"
-	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
+	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
 // ReverseGeocodingToolInput is the typed input for ReverseGeocodingTool.

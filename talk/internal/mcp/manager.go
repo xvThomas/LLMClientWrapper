@@ -16,10 +16,10 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	projectlogger "github.com/pixime-net/talkbackend/talk-libs/logger"
-	"github.com/pixime-net/talkbackend/talk-libs/version"
+	projectlogger "github.com/pixime-net/talk-libs/logger"
+	"github.com/pixime-net/talk-libs/version"
 
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/domain"
 )
 
 const (

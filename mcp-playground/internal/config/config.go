@@ -3,7 +3,7 @@ package config
 import (
 	"github.com/joho/godotenv"
 
-	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
+	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
 // ServerEnv holds the environment configuration specific to this MCP server.

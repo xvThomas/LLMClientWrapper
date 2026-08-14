@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
-	"github.com/pixime-net/talkbackend/talk/internal/mcp"
+	"github.com/pixime-net/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/mcp"
 )
 
 // spyPrinter captures all output for assertions in tests.

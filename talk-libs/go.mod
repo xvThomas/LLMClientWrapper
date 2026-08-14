@@ -1,4 +1,4 @@
-module github.com/pixime-net/talkbackend/talk-libs
+module github.com/pixime-net/talk-libs
 
 go 1.25.0
 

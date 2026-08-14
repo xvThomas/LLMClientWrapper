@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/domain"
 )
 
 // sessionData holds the messages and metadata for a single session.

@@ -3,7 +3,7 @@ package router
 import (
 	"testing"
 
-	"github.com/pixime-net/talkbackend/talk/internal/config"
+	"github.com/pixime-net/talk/internal/config"
 )
 
 func TestRouter_UnknownModelReturnsError(t *testing.T) {

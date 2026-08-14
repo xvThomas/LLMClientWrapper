@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/pixime-net/talkbackend/mcp-playground/internal/config"
+	"github.com/pixime-net/mcp-playground/internal/config"
 )
 
 func TestBuildApp_Minimal(t *testing.T) {

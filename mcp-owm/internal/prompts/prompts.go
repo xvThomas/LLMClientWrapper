@@ -1,6 +1,6 @@
 package prompts
 
-import "github.com/pixime-net/talkbackend/talk-libs/mcpserver"
+import "github.com/pixime-net/talk-libs/mcpserver"
 
 const presentResultAs = "Present the result as: "
 

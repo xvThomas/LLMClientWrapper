@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 
-	"github.com/pixime-net/talkbackend/talk-libs/mcpserver"
+	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
 // SumToolInput holds the two integers to add.

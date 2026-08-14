@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/domain"
 )
 
 func captureStdout(t *testing.T, fn func()) string {

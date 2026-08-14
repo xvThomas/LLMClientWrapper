@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pixime-net/talkbackend/talk-libs/version"
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talk-libs/version"
+	"github.com/pixime-net/talk/internal/domain"
 )
 
 // LangfuseUsageReporter implements domain.MessageEventHandler by sending traces to Langfuse

@@ -9,7 +9,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/pixime-net/talkbackend/talk-libs/logger"
+	"github.com/pixime-net/talk-libs/logger"
 )
 
 // ToolRegistrar registers a tool on an mcp.Server.

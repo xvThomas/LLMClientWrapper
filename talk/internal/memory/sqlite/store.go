@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pixime-net/talkbackend/talk/internal/domain"
+	"github.com/pixime-net/talk/internal/domain"
 
 	_ "modernc.org/sqlite" // registers the SQLite driver with database/sql
 )

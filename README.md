@@ -44,7 +44,7 @@ go.work (root)
 ### 1. Clone and build
 
 ```bash
-git clone https://github.com/pixime-net/talkbackend.git
+git clone https://github.com/pixime-net/talk-backend.git
 cd talkbackend
 make build
 ```

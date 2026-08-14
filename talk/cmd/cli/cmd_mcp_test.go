@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pixime-net/talkbackend/talk/internal/mcp"
+	"github.com/pixime-net/talk/internal/mcp"
 )
 
 func TestCmdMCPList_Empty(t *testing.T) {

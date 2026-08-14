@@ -1,6 +1,6 @@
 package prompts
 
-import "github.com/pixime-net/talkbackend/talk-libs/mcpserver"
+import "github.com/pixime-net/talk-libs/mcpserver"
 
 // Sum instructs the LLM to use the sum tool for adding two integers.
 var Sum = mcpserver.Prompt{
