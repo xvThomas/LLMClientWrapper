@@ -161,8 +161,16 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 		callCount++
 
 		response.TurnID = turnID
-		if err := m.storeAssistantResponse(ctx, response, model, turnSpanID, kind, usage,
-			callStartedAt, lastCallEndedAt, conversationInput); err != nil {
+		if err := m.storeAssistantResponse(ctx, assistantResponse{
+			response:          response,
+			model:             model,
+			turnSpanID:        turnSpanID,
+			kind:              kind,
+			usage:             usage,
+			callStartedAt:     callStartedAt,
+			callEndedAt:       lastCallEndedAt,
+			conversationInput: conversationInput,
+		}); err != nil {
 			return "", fmt.Errorf("handling assistant message event: %w", err)
 		}
 
@@ -215,37 +223,39 @@ func (m *ConversationManager) Chat(ctx context.Context, userInput string) (strin
 	return "", ErrMaxToolIterations
 }
 
+type assistantResponse struct {
+	response          *Message
+	model             Model
+	turnSpanID        string
+	kind              CallKind
+	usage             Usage
+	callStartedAt     time.Time
+	callEndedAt       time.Time
+	conversationInput string
+}
+
 // storeAssistantResponse stores the assistant message in the conversation history.
 // When the model responds with only tool calls (empty text content), it substitutes
 // the content with a human-readable tool-call summary for observability.
-func (m *ConversationManager) storeAssistantResponse(
-	ctx context.Context,
-	response *Message,
-	model Model,
-	turnSpanID string,
-	kind CallKind,
-	usage Usage,
-	callStartedAt, callEndedAt time.Time,
-	conversationInput string,
-) error {
-	stored := *response
+func (m *ConversationManager) storeAssistantResponse(ctx context.Context, response assistantResponse) error {
+	stored := *response.response
 	if strings.TrimSpace(stored.Content) == "" && len(stored.ToolCalls) > 0 {
 		stored.Content = formatToolCallSummary(stored.ToolCalls)
 	}
 	return m.messageHandler.HandleMessageEvent(ctx, MessageEvent{
 		Message:      stored,
 		SessionScope: m.sessionScope,
-		Model:        model,
-		TurnSpanID:   turnSpanID,
-		Kind:         kind,
-		Usage:        usage,
-		StartedAt:    callStartedAt,
-		EndedAt:      callEndedAt,
+		Model:        response.model,
+		TurnSpanID:   response.turnSpanID,
+		Kind:         response.kind,
+		Usage:        response.usage,
+		StartedAt:    response.callStartedAt,
+		EndedAt:      response.callEndedAt,
 		APICall: APICallEvent{
-			StartedAt: callStartedAt,
-			EndedAt:   callEndedAt,
-			Input:     conversationInput,
-			Output:    formatAPICallOutput(response.Content, response.ToolCalls),
+			StartedAt: response.callStartedAt,
+			EndedAt:   response.callEndedAt,
+			Input:     response.conversationInput,
+			Output:    formatAPICallOutput(response.response.Content, response.response.ToolCalls),
 		},
 	})
 }

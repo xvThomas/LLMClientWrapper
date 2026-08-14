@@ -9,6 +9,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const failedToGetCallerFilePath = "failed to get caller file path"
+
 // findModuleRoot walks up from dir until it finds a go.mod file.
 func findModuleRoot(dir string) string {
 	for {
@@ -28,7 +30,7 @@ func findModuleRoot(dir string) string {
 func GetProjectRoot() string {
 	_, filename, _, ok := runtime.Caller(1)
 	if !ok {
-		panic("failed to get caller file path")
+		panic(failedToGetCallerFilePath)
 	}
 	return findModuleRoot(filepath.Dir(filename))
 }
@@ -41,7 +43,7 @@ func SetupTestEnv(t testing.TB) {
 
 	_, filename, _, ok := runtime.Caller(1)
 	if !ok {
-		panic("failed to get caller file path")
+		panic(failedToGetCallerFilePath)
 	}
 	projectRoot := findModuleRoot(filepath.Dir(filename))
 
@@ -57,7 +59,7 @@ func SetupTestEnvWithRequiredVarsOrSkipTest(t testing.TB, requiredVars ...string
 
 	_, filename, _, ok := runtime.Caller(1)
 	if !ok {
-		panic("failed to get caller file path")
+		panic(failedToGetCallerFilePath)
 	}
 	projectRoot := findModuleRoot(filepath.Dir(filename))
 
