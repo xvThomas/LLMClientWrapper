@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"golang.org/x/time/rate"
 	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
@@ -64,7 +64,7 @@ type Forecast5Days3HoursWeatherTool struct {
 }
 
 // NewForecast5Days3HoursWeatherTool creates a Forecast5Days3HoursWeatherTool with the given API key.
-func NewForecast5Days3HoursWeatherTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[ForecastToolInput, ForecastToolOutput] {
+func NewForecast5Days3HoursWeatherTool(apiKey string, limiter *rate.Limiter) mcpserver.MCPTool[ForecastToolInput, ForecastToolOutput] {
 	return &Forecast5Days3HoursWeatherTool{client: newHTTPClient(defaultBaseURL, apiKey, nil, limiter)}
 }
 
@@ -72,7 +72,7 @@ var _ mcpserver.MCPTool[ForecastToolInput, ForecastToolOutput] = (*Forecast5Days
 
 // newForecast5Days3HoursWeatherToolWithBaseURL creates a Forecast5Days3HoursWeatherTool with a custom base URL (for testing).
 func newForecast5Days3HoursWeatherToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *Forecast5Days3HoursWeatherTool {
-	return &Forecast5Days3HoursWeatherTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
+	return &Forecast5Days3HoursWeatherTool{client: newHTTPClient(baseURL, apiKey, httpCl, nil)}
 }
 
 // Name returns the tool name as expected by the model.

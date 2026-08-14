@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"golang.org/x/time/rate"
 	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
@@ -29,7 +29,7 @@ type ReverseGeocodingTool struct {
 }
 
 // NewReverseGeocodingTool creates a ReverseGeocodingTool with the given API key.
-func NewReverseGeocodingTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[ReverseGeocodingToolInput, ReverseGeocodingToolOutput] {
+func NewReverseGeocodingTool(apiKey string, limiter *rate.Limiter) mcpserver.MCPTool[ReverseGeocodingToolInput, ReverseGeocodingToolOutput] {
 	return &ReverseGeocodingTool{client: newHTTPClient(defaultGeoBaseURL, apiKey, nil, limiter)}
 }
 
@@ -37,7 +37,7 @@ var _ mcpserver.MCPTool[ReverseGeocodingToolInput, ReverseGeocodingToolOutput] =
 
 // newReverseGeocodingToolWithBaseURL creates a ReverseGeocodingTool with a custom base URL (for testing).
 func newReverseGeocodingToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *ReverseGeocodingTool {
-	return &ReverseGeocodingTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
+	return &ReverseGeocodingTool{client: newHTTPClient(baseURL, apiKey, httpCl, nil)}
 }
 
 // Name returns the tool name as expected by the model.

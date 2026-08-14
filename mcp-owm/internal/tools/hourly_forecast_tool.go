@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"golang.org/x/time/rate"
 	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
@@ -34,7 +34,7 @@ type HourlyForecastTool struct {
 }
 
 // NewHourlyForecastTool creates a HourlyForecastTool with the given API key.
-func NewHourlyForecastTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[HourlyForecastToolInput, HourlyForecastToolOutput] {
+func NewHourlyForecastTool(apiKey string, limiter *rate.Limiter) mcpserver.MCPTool[HourlyForecastToolInput, HourlyForecastToolOutput] {
 	return &HourlyForecastTool{client: newHTTPClient(defaultProBaseURL, apiKey, nil, limiter)}
 }
 
@@ -42,7 +42,7 @@ var _ mcpserver.MCPTool[HourlyForecastToolInput, HourlyForecastToolOutput] = (*H
 
 // newHourlyForecastToolWithBaseURL creates a HourlyForecastTool with a custom base URL (for testing).
 func newHourlyForecastToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *HourlyForecastTool {
-	return &HourlyForecastTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
+	return &HourlyForecastTool{client: newHTTPClient(baseURL, apiKey, httpCl, nil)}
 }
 
 // Name returns the tool name as expected by the model.

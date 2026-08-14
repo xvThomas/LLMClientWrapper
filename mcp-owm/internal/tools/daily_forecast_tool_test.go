@@ -10,15 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
-
 	"github.com/pixime-net/talk-libs/testutils"
 
 	"github.com/joho/godotenv"
 )
 
 func TestDailyForecastTool_Metadata(t *testing.T) {
-	tool := NewDailyForecastTool("key", ratelimit.Noop())
+	tool := NewDailyForecastTool("key", nil)
 	if tool.Name() != "get_daily_forecast" {
 		t.Errorf("unexpected tool name: %q", tool.Name())
 	}
@@ -302,7 +300,7 @@ func TestDailyForecastTool_Call_WithoutCountLimit(t *testing.T) {
 }
 
 func TestDailyForecastTool_Call_ZeroCoordinates(t *testing.T) {
-	tool := NewDailyForecastTool("key", ratelimit.Noop())
+	tool := NewDailyForecastTool("key", nil)
 	_, err := tool.Call(context.Background(), DailyForecastToolInput{Lat: 0, Lon: 0})
 	if err == nil {
 		t.Error("expected error for zero coordinates")
@@ -386,7 +384,7 @@ func TestDailyForecastTool_Integration(t *testing.T) {
 		t.Skip("16-day daily forecast requires a paid OWM subscription (set OPENWEATHERMAP_FREE_PLAN=false to run)")
 	}
 
-	tool := NewDailyForecastTool(apiKey, ratelimit.Noop())
+	tool := NewDailyForecastTool(apiKey, nil)
 	result, err := tool.Call(context.Background(), DailyForecastToolInput{Lat: 48.8566, Lon: 2.3522})
 	if err != nil {
 		if strings.Contains(err.Error(), "status 401") {

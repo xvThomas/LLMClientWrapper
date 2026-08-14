@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"golang.org/x/time/rate"
 	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
@@ -77,7 +77,7 @@ type CurrentWeatherTool struct {
 }
 
 // NewCurrentWeatherTool creates a CurrentWeatherTool with the given API key.
-func NewCurrentWeatherTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[CurrentWeatherToolInput, CurrentWeatherToolOutput] {
+func NewCurrentWeatherTool(apiKey string, limiter *rate.Limiter) mcpserver.MCPTool[CurrentWeatherToolInput, CurrentWeatherToolOutput] {
 	return &CurrentWeatherTool{client: newHTTPClient(defaultBaseURL, apiKey, nil, limiter)}
 }
 
@@ -85,7 +85,7 @@ var _ mcpserver.MCPTool[CurrentWeatherToolInput, CurrentWeatherToolOutput] = (*C
 
 // newCurrentWeatherToolWithBaseURL creates a CurrentWeatherTool with a custom base URL (for testing).
 func newCurrentWeatherToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *CurrentWeatherTool {
-	return &CurrentWeatherTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
+	return &CurrentWeatherTool{client: newHTTPClient(baseURL, apiKey, httpCl, nil)}
 }
 
 // Name returns the tool name as expected by the model.

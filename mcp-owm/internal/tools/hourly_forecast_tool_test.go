@@ -10,15 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
-
 	"github.com/pixime-net/talk-libs/testutils"
 
 	"github.com/joho/godotenv"
 )
 
 func TestHourlyForecastTool_Metadata(t *testing.T) {
-	tool := NewHourlyForecastTool("key", ratelimit.Noop())
+	tool := NewHourlyForecastTool("key", nil)
 	if tool.Name() != "get_hourly_forecast" {
 		t.Errorf("unexpected tool name: %q", tool.Name())
 	}
@@ -199,7 +197,7 @@ func TestHourlyForecastTool_Call_WithoutCountLimit(t *testing.T) {
 }
 
 func TestHourlyForecastTool_Call_ZeroCoordinates(t *testing.T) {
-	tool := NewHourlyForecastTool("key", ratelimit.Noop())
+	tool := NewHourlyForecastTool("key", nil)
 	_, err := tool.Call(context.Background(), HourlyForecastToolInput{Lat: 0, Lon: 0})
 	if err == nil {
 		t.Error("expected error for zero coordinates")
@@ -281,7 +279,7 @@ func TestHourlyForecastTool_Integration(t *testing.T) {
 		t.Skip("hourly forecast requires a paid OWM subscription (set OPENWEATHERMAP_FREE_PLAN=false to run)")
 	}
 
-	tool := NewHourlyForecastTool(apiKey, ratelimit.Noop())
+	tool := NewHourlyForecastTool(apiKey, nil)
 	result, err := tool.Call(context.Background(), HourlyForecastToolInput{Lat: 48.8566, Lon: 2.3522})
 	if err != nil {
 		if strings.Contains(err.Error(), "status 401") {

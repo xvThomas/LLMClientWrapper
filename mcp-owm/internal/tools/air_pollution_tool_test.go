@@ -8,15 +8,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
-
 	"github.com/pixime-net/talk-libs/testutils"
 
 	"github.com/joho/godotenv"
 )
 
 func TestAirPollutionTool_Metadata(t *testing.T) {
-	tool := NewAirPollutionTool("key", ratelimit.Noop())
+	tool := NewAirPollutionTool("key", nil)
 	if tool.Name() != "get_current_air_pollution" {
 		t.Errorf("unexpected tool name: %q", tool.Name())
 	}
@@ -87,7 +85,7 @@ func TestAirPollutionTool_Call_Success(t *testing.T) {
 }
 
 func TestAirPollutionTool_Call_ZeroCoordinates(t *testing.T) {
-	tool := NewAirPollutionTool("key", ratelimit.Noop())
+	tool := NewAirPollutionTool("key", nil)
 	_, err := tool.Call(context.Background(), AirPollutionToolInput{Lat: 0, Lon: 0})
 	if err == nil {
 		t.Error("expected error for zero coordinates")
@@ -133,7 +131,7 @@ func TestAirPollutionTool_Integration(t *testing.T) {
 		t.Skip("OPENWEATHERMAP_API_KEY not set in .env.test, skipping integration test")
 	}
 
-	tool := NewAirPollutionTool(apiKey, ratelimit.Noop())
+	tool := NewAirPollutionTool(apiKey, nil)
 	result, err := tool.Call(context.Background(), AirPollutionToolInput{Lat: 48.8566, Lon: 2.3522})
 	if err != nil {
 		t.Fatalf("integration call failed: %v", err)

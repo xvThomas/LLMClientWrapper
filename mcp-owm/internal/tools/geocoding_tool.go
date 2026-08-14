@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"golang.org/x/time/rate"
 	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
@@ -39,7 +39,7 @@ type GeocodingTool struct {
 }
 
 // NewGeocodingTool creates a GeocodingTool with the given API key.
-func NewGeocodingTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[GeocodingToolInput, GeocodingToolOutput] {
+func NewGeocodingTool(apiKey string, limiter *rate.Limiter) mcpserver.MCPTool[GeocodingToolInput, GeocodingToolOutput] {
 	return &GeocodingTool{client: newHTTPClient(defaultGeoBaseURL, apiKey, nil, limiter)}
 }
 
@@ -47,7 +47,7 @@ var _ mcpserver.MCPTool[GeocodingToolInput, GeocodingToolOutput] = (*GeocodingTo
 
 // newGeocodingToolWithBaseURL creates a GeocodingTool with a custom base URL (for testing).
 func newGeocodingToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *GeocodingTool {
-	return &GeocodingTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
+	return &GeocodingTool{client: newHTTPClient(baseURL, apiKey, httpCl, nil)}
 }
 
 // Name returns the tool name as expected by the model.

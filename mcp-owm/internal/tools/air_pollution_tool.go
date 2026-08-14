@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"golang.org/x/time/rate"
 	"github.com/pixime-net/talk-libs/mcpserver"
 )
 
@@ -43,7 +43,7 @@ type AirPollutionTool struct {
 }
 
 // NewAirPollutionTool creates an AirPollutionTool with the given API key.
-func NewAirPollutionTool(apiKey string, limiter *ratelimit.Limiter) mcpserver.MCPTool[AirPollutionToolInput, AirPollutionToolOutput] {
+func NewAirPollutionTool(apiKey string, limiter *rate.Limiter) mcpserver.MCPTool[AirPollutionToolInput, AirPollutionToolOutput] {
 	return &AirPollutionTool{client: newHTTPClient(defaultBaseURL, apiKey, nil, limiter)}
 }
 
@@ -51,7 +51,7 @@ var _ mcpserver.MCPTool[AirPollutionToolInput, AirPollutionToolOutput] = (*AirPo
 
 // newAirPollutionToolWithBaseURL creates an AirPollutionTool with a custom base URL (for testing).
 func newAirPollutionToolWithBaseURL(apiKey, baseURL string, httpCl *http.Client) *AirPollutionTool {
-	return &AirPollutionTool{client: newHTTPClient(baseURL, apiKey, httpCl, ratelimit.Noop())}
+	return &AirPollutionTool{client: newHTTPClient(baseURL, apiKey, httpCl, nil)}
 }
 
 // Name returns the tool name as expected by the model.

@@ -10,15 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
-
 	"github.com/pixime-net/talk-libs/testutils"
 
 	"github.com/joho/godotenv"
 )
 
 func TestForecast5Days3HoursWeatherTool_Metadata(t *testing.T) {
-	tool := NewForecast5Days3HoursWeatherTool("key", ratelimit.Noop())
+	tool := NewForecast5Days3HoursWeatherTool("key", nil)
 	if tool.Name() != "get_weather_forecast" {
 		t.Errorf("unexpected tool name: %q", tool.Name())
 	}
@@ -212,7 +210,7 @@ func TestForecast5Days3HoursWeatherTool_Call_WithoutCountLimit(t *testing.T) {
 }
 
 func TestForecast5Days3HoursWeatherTool_Call_EmptyCity(t *testing.T) {
-	tool := NewForecast5Days3HoursWeatherTool("key", ratelimit.Noop())
+	tool := NewForecast5Days3HoursWeatherTool("key", nil)
 	_, err := tool.Call(context.Background(), ForecastToolInput{Lat: 0, Lon: 0})
 	if err == nil {
 		t.Error("expected error for zero coordinates")
@@ -290,7 +288,7 @@ func TestForecast5Days3HoursWeatherTool_Integration(t *testing.T) {
 		t.Skip("OPENWEATHERMAP_API_KEY not set in .env.test, skipping integration test")
 	}
 
-	tool := NewForecast5Days3HoursWeatherTool(apiKey, ratelimit.Noop())
+	tool := NewForecast5Days3HoursWeatherTool(apiKey, nil)
 	result, err := tool.Call(context.Background(), ForecastToolInput{Lat: 48.8566, Lon: 2.3522})
 	if err != nil {
 		t.Fatalf("integration call failed: %v", err)

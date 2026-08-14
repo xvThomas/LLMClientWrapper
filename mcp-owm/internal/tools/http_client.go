@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
+	"golang.org/x/time/rate"
 )
 
 const httpClientTimeout = 10 * time.Second
@@ -18,22 +18,21 @@ type httpClient struct {
 	baseURL string
 	apiKey  string
 	client  *http.Client
-	limiter *ratelimit.Limiter
+	limiter *rate.Limiter
 }
 
-func newHTTPClient(baseURL, apiKey string, client *http.Client, limiter *ratelimit.Limiter) *httpClient {
+func newHTTPClient(baseURL, apiKey string, client *http.Client, limiter *rate.Limiter) *httpClient {
 	if client == nil {
 		client = &http.Client{Timeout: httpClientTimeout}
-	}
-	if limiter == nil {
-		limiter = ratelimit.Noop()
 	}
 	return &httpClient{baseURL: baseURL, apiKey: apiKey, client: client, limiter: limiter}
 }
 
 func (c *httpClient) getJSON(ctx context.Context, path string, query url.Values, out any) error {
-	if err := c.limiter.Wait(ctx); err != nil {
-		return fmt.Errorf("rate limiter: %w", err)
+	if c.limiter != nil {
+		if err := c.limiter.Wait(ctx); err != nil {
+			return fmt.Errorf("rate limiter: %w", err)
+		}
 	}
 
 	if query == nil {

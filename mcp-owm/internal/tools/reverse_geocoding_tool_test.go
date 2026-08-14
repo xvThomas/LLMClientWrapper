@@ -9,15 +9,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/pixime-net/mcp-owm/internal/ratelimit"
-
 	"github.com/pixime-net/talk-libs/testutils"
 
 	"github.com/joho/godotenv"
 )
 
 func TestReverseGeocodingTool_Metadata(t *testing.T) {
-	tool := NewReverseGeocodingTool("key", ratelimit.Noop())
+	tool := NewReverseGeocodingTool("key", nil)
 	if tool.Name() != "reverse_geocode" {
 		t.Errorf("unexpected tool name: %q", tool.Name())
 	}
@@ -79,7 +77,7 @@ func TestReverseGeocodingTool_Call_WithLimit(t *testing.T) {
 }
 
 func TestReverseGeocodingTool_Call_ZeroCoordinates(t *testing.T) {
-	tool := NewReverseGeocodingTool("key", ratelimit.Noop())
+	tool := NewReverseGeocodingTool("key", nil)
 	_, err := tool.Call(context.Background(), ReverseGeocodingToolInput{Lat: 0, Lon: 0})
 	if err == nil {
 		t.Error("expected error for zero coordinates")
@@ -108,7 +106,7 @@ func TestReverseGeocodingTool_Integration(t *testing.T) {
 		t.Skip("OPENWEATHERMAP_API_KEY not set in .env.test, skipping integration test")
 	}
 
-	tool := NewReverseGeocodingTool(apiKey, ratelimit.Noop())
+	tool := NewReverseGeocodingTool(apiKey, nil)
 	result, err := tool.Call(context.Background(), ReverseGeocodingToolInput{Lat: 48.8566, Lon: 2.3522})
 	if err != nil {
 		t.Fatalf("integration call failed: %v", err)
