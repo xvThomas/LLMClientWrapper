@@ -77,7 +77,11 @@ func (t *HourlyForecastTool) Call(ctx context.Context, input HourlyForecastToolI
 			v := item.Snow.OneH
 			snow = &v
 		}
-		out.Forecasts = append(out.Forecasts, buildForecastEntry(item.Dt, item.Main, item.Weather, item.Clouds, item.Wind, item.Visibility, item.Pop, precip, snow))
+		out.Forecasts = append(out.Forecasts, buildForecastEntry(forecastEntryInput{
+			Dt: item.Dt, Main: item.Main, Weather: item.Weather, Clouds: item.Clouds,
+			Wind: item.Wind, Visibility: item.Visibility, Pop: item.Pop,
+			Precipitation: precip, Snow: snow,
+		}))
 	}
 
 	return out, nil

@@ -17,28 +17,40 @@ func buildForecastCity(city owmCityResponse) ForecastCity {
 	}
 }
 
-func buildForecastEntry(dt int64, main owmMainResponse, weather []owmWeatherResponse, clouds owmCloudsResponse, wind owmWindResponse, visibility int, pop float64, precipitation, snow *float64) ForecastEntry {
+type forecastEntryInput struct {
+	Dt            int64
+	Main          owmMainResponse
+	Weather       []owmWeatherResponse
+	Clouds        owmCloudsResponse
+	Wind          owmWindResponse
+	Visibility    int
+	Pop           float64
+	Precipitation *float64
+	Snow          *float64
+}
+
+func buildForecastEntry(in forecastEntryInput) ForecastEntry {
 	entry := ForecastEntry{
-		DateTime:      time.Unix(dt, 0).UTC().Format(time.RFC3339),
-		Temp:          main.Temp,
-		FeelsLike:     main.FeelsLike,
-		TempMin:       main.TempMin,
-		TempMax:       main.TempMax,
-		Pressure:      main.Pressure,
-		Humidity:      main.Humidity,
-		SeaLevel:      main.SeaLevel,
-		GrndLevel:     main.GrndLevel,
-		Cloudiness:    clouds.All,
-		WindSpeed:     wind.Speed,
-		WindDeg:       wind.Deg,
-		WindGust:      wind.Gust,
-		Visibility:    visibility,
-		Pop:           pop,
-		Precipitation: precipitation,
-		Snow:          snow,
+		DateTime:      time.Unix(in.Dt, 0).UTC().Format(time.RFC3339),
+		Temp:          in.Main.Temp,
+		FeelsLike:     in.Main.FeelsLike,
+		TempMin:       in.Main.TempMin,
+		TempMax:       in.Main.TempMax,
+		Pressure:      in.Main.Pressure,
+		Humidity:      in.Main.Humidity,
+		SeaLevel:      in.Main.SeaLevel,
+		GrndLevel:     in.Main.GrndLevel,
+		Cloudiness:    in.Clouds.All,
+		WindSpeed:     in.Wind.Speed,
+		WindDeg:       in.Wind.Deg,
+		WindGust:      in.Wind.Gust,
+		Visibility:    in.Visibility,
+		Pop:           in.Pop,
+		Precipitation: in.Precipitation,
+		Snow:          in.Snow,
 	}
-	entry.Weather = make([]WeatherCondition, 0, len(weather))
-	for _, w := range weather {
+	entry.Weather = make([]WeatherCondition, 0, len(in.Weather))
+	for _, w := range in.Weather {
 		entry.Weather = append(entry.Weather, WeatherCondition{
 			Main:        w.Main,
 			Description: w.Description,
