@@ -198,3 +198,45 @@ func (a *App) runStdio() {
 		os.Exit(1)
 	}
 }
+
+// WithBaseEnvHTTPSecurity returns an Option that configures HTTP security
+// settings from the common BaseEnv fields.
+func WithBaseEnvHTTPSecurity(env BaseEnv) Option {
+	return WithHTTPSecurity(HTTPSecurityConfig{
+		RateLimit:      env.HTTPRateLimit,
+		RateBurst:      env.HTTPRateBurst,
+		ReadTimeout:    env.HTTPReadTimeout,
+		WriteTimeout:   env.HTTPWriteTimeout,
+		IdleTimeout:    env.HTTPIdleTimeout,
+		TrustedProxies: env.TrustedProxies,
+	})
+}
+
+// WithBaseEnvAuth returns the authentication Options derived from the common
+// BaseEnv fields (API key and/or OAuth). The returned slice is empty when
+// neither is configured.
+func WithBaseEnvAuth(env BaseEnv) []Option {
+	var opts []Option
+	if env.APIKey != "" {
+		opts = append(opts, WithAPIKey(env.APIKey))
+	}
+	if env.OAuthAuthorizationServer != "" {
+		cfg := &OAuthConfig{
+			AuthorizationServerURL: env.OAuthAuthorizationServer,
+			ResourceBaseURL:        env.BaseURL,
+			Scopes:                 env.OAuthScopesList(),
+			TokenVerifier: NewJWKSTokenVerifier(JWKSVerifierConfig{
+				IssuerURL: env.OAuthAuthorizationServer,
+				Audience:  env.OAuthAudience,
+			}),
+		}
+		if env.OAuthAudience != "" {
+			cfg.ASProxy = &ASProxyConfig{
+				Audience:     env.OAuthAudience,
+				ClientSecret: env.OAuthClientSecret,
+			}
+		}
+		opts = append(opts, WithOAuth(cfg))
+	}
+	return opts
+}

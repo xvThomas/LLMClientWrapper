@@ -32,49 +32,15 @@ func buildApp(env *config.ServerEnv) *mcpserver.App {
 	// Rate limiter for navigation endpoint (5 req/s).
 	navLimiter := rate.NewLimiter(rate.Limit(5), 5)
 
-	reverseGeocodeTool := tools.NewReverseGeocodingTool(ignLimiter)
-	geocodeTool := tools.NewGeocodingTool(ignLimiter)
-	routeTool := tools.NewRouteTool(navLimiter, env.GetGeoJSONGeometry)
-	distanceTool := tools.NewDistanceTimeTool(navLimiter)
-
 	opts := []mcpserver.Option{
 		mcpserver.WithTools(
-			mcpserver.RegisterTool(reverseGeocodeTool),
-			mcpserver.RegisterTool(geocodeTool),
-			mcpserver.RegisterTool(routeTool),
-			mcpserver.RegisterTool(distanceTool),
+			mcpserver.RegisterTool(tools.NewReverseGeocodingTool(ignLimiter)),
+			mcpserver.RegisterTool(tools.NewGeocodingTool(ignLimiter)),
+			mcpserver.RegisterTool(tools.NewRouteTool(navLimiter, env.GetGeoJSONGeometry)),
+			mcpserver.RegisterTool(tools.NewDistanceTimeTool(navLimiter)),
 		),
-		mcpserver.WithHTTPSecurity(mcpserver.HTTPSecurityConfig{
-			RateLimit:      env.HTTPRateLimit,
-			RateBurst:      env.HTTPRateBurst,
-			ReadTimeout:    env.HTTPReadTimeout,
-			WriteTimeout:   env.HTTPWriteTimeout,
-			IdleTimeout:    env.HTTPIdleTimeout,
-			TrustedProxies: env.TrustedProxies,
-		}),
+		mcpserver.WithBaseEnvHTTPSecurity(env.BaseEnv),
 	}
-
-	if env.APIKey != "" {
-		opts = append(opts, mcpserver.WithAPIKey(env.APIKey))
-	}
-	if env.OAuthAuthorizationServer != "" {
-		oauthCfg := &mcpserver.OAuthConfig{
-			AuthorizationServerURL: env.OAuthAuthorizationServer,
-			ResourceBaseURL:        env.BaseURL,
-			Scopes:                 env.OAuthScopesList(),
-			TokenVerifier: mcpserver.NewJWKSTokenVerifier(mcpserver.JWKSVerifierConfig{
-				IssuerURL: env.OAuthAuthorizationServer,
-				Audience:  env.OAuthAudience,
-			}),
-		}
-		if env.OAuthAudience != "" {
-			oauthCfg.ASProxy = &mcpserver.ASProxyConfig{
-				Audience:     env.OAuthAudience,
-				ClientSecret: env.OAuthClientSecret,
-			}
-		}
-		opts = append(opts, mcpserver.WithOAuth(oauthCfg))
-	}
-
+	opts = append(opts, mcpserver.WithBaseEnvAuth(env.BaseEnv)...)
 	return mcpserver.NewApp("ign-nav-mcp", version.Version, opts...)
 }

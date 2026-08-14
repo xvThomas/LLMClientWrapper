@@ -21,6 +21,7 @@
     "oauthex",
     "openai",
     "osrm",
+    "pixime",
     "sess",
     "sqlite",
     "sqlitestore",

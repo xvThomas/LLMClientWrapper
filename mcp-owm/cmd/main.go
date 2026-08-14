@@ -46,14 +46,7 @@ func buildApp(env *config.ServerEnv) *mcpserver.App {
 			mcpserver.RegisterPrompt(prompts.CurrentAir),
 			mcpserver.RegisterPrompt(prompts.ForecastAir),
 		),
-		mcpserver.WithHTTPSecurity(mcpserver.HTTPSecurityConfig{
-			RateLimit:      env.HTTPRateLimit,
-			RateBurst:      env.HTTPRateBurst,
-			ReadTimeout:    env.HTTPReadTimeout,
-			WriteTimeout:   env.HTTPWriteTimeout,
-			IdleTimeout:    env.HTTPIdleTimeout,
-			TrustedProxies: env.TrustedProxies,
-		}),
+		mcpserver.WithBaseEnvHTTPSecurity(env.BaseEnv),
 	}
 
 	if env.FreePlan {
@@ -70,27 +63,6 @@ func buildApp(env *config.ServerEnv) *mcpserver.App {
 			mcpserver.WithTools(mcpserver.RegisterTool(dailyForecastTool)),
 		)
 	}
-	if env.APIKey != "" {
-		opts = append(opts, mcpserver.WithAPIKey(env.APIKey))
-	}
-	if env.OAuthAuthorizationServer != "" {
-		oauthCfg := &mcpserver.OAuthConfig{
-			AuthorizationServerURL: env.OAuthAuthorizationServer,
-			ResourceBaseURL:        env.BaseURL,
-			Scopes:                 env.OAuthScopesList(),
-			TokenVerifier: mcpserver.NewJWKSTokenVerifier(mcpserver.JWKSVerifierConfig{
-				IssuerURL: env.OAuthAuthorizationServer,
-				Audience:  env.OAuthAudience,
-			}),
-		}
-		if env.OAuthAudience != "" {
-			oauthCfg.ASProxy = &mcpserver.ASProxyConfig{
-				Audience:     env.OAuthAudience,
-				ClientSecret: env.OAuthClientSecret,
-			}
-		}
-		opts = append(opts, mcpserver.WithOAuth(oauthCfg))
-	}
-
+	opts = append(opts, mcpserver.WithBaseEnvAuth(env.BaseEnv)...)
 	return mcpserver.NewApp("owm-mcp", version.Version, opts...)
 }
