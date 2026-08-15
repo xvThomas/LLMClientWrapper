@@ -23,7 +23,9 @@ func TestSetupTestEnv(t *testing.T) {
 
 func TestSetupTestEnvWithRequiredVarsOrSkipTest_Skips(t *testing.T) {
 	const key = "TESTUTILS_REQUIRED_VAR_UNLIKELY_TO_EXIST_XYZ123"
-	os.Unsetenv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatal(err)
+	}
 	t.Run("skipped", func(t *testing.T) {
 		SetupTestEnvWithRequiredVarsOrSkipTest(t, key)
 		t.Error("should have been skipped before reaching here")
@@ -38,7 +40,9 @@ func TestSetupTestEnvWithRequiredVarsOrSkipTest_DoesNotSkip(t *testing.T) {
 
 func TestRequireEnv_Skips(t *testing.T) {
 	const key = "TESTUTILS_REQUIRE_ENV_MISSING_XYZ123"
-	os.Unsetenv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatal(err)
+	}
 	t.Run("skipped", func(t *testing.T) {
 		got := RequireEnv(t, key)
 		if !strings.Contains(got, "") {
