@@ -77,6 +77,8 @@ type fakeSessionBrowser struct {
 	sessions  []domain.SessionSummary
 	turns     map[string][]domain.HistoryTurn
 	deleteErr error
+	listErr   error
+	loadErr   error
 	deleted   []string
 }
 
@@ -87,11 +89,11 @@ func newFakeSessionBrowser() *fakeSessionBrowser {
 }
 
 func (s *fakeSessionBrowser) ListSessions(_ context.Context, _ string) ([]domain.SessionSummary, error) {
-	return s.sessions, nil
+	return s.sessions, s.listErr
 }
 
 func (s *fakeSessionBrowser) LoadHistoryTurnsFromSession(_ context.Context, id string) ([]domain.HistoryTurn, error) {
-	return s.turns[id], nil
+	return s.turns[id], s.loadErr
 }
 
 func (s *fakeSessionBrowser) DeleteSession(_ context.Context, id string) error {

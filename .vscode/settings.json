@@ -23,11 +23,13 @@
     "openai",
     "osrm",
     "pixime",
+    "serialisable",
     "sess",
     "sqlite",
     "sqlitestore",
     "testdata",
     "tmpl",
+    "unmarshalable",
     "unmarshalling",
     "unmaterialized",
     "upserting"

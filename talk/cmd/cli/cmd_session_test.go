@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -331,5 +332,183 @@ func TestCmdSessionRemove_InvalidChoice(t *testing.T) {
 	out := p.Output()
 	if !strings.Contains(out, "Invalid choice") {
 		t.Errorf("expected 'Invalid choice', got: %s", out)
+	}
+}
+
+// --- additional coverage tests ---
+
+func TestCmdSession_ListSubcommand(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+	sb := newFakeSessionBrowser()
+	sb.sessions = []domain.SessionSummary{
+		{ID: app.Scope.SessionID(), Title: "my session", CreatedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)},
+	}
+	app.Sessions = sb
+	app.LR = newScriptReader("") // cancel
+
+	app.cmdSession(context.Background(), "list")
+
+	if !strings.Contains(p.Output(), "Sessions:") {
+		t.Errorf("expected sessions list output, got: %s", p.Output())
+	}
+}
+
+func TestCmdSession_NewSubcommand(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+
+	app.cmdSession(context.Background(), "new")
+
+	if !strings.Contains(p.Output(), "New session created") {
+		t.Errorf("expected 'New session created', got: %s", p.Output())
+	}
+}
+
+func TestCmdSession_RemoveSubcommand(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+
+	app.cmdSession(context.Background(), "remove")
+
+	if !strings.Contains(p.Output(), "no sessions to remove") {
+		t.Errorf("expected 'no sessions to remove', got: %s", p.Output())
+	}
+}
+
+func TestCmdSessionNew_WithManager(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+	mgr := domain.NewConversationManager(domain.ConversationManagerConfig{
+		Scope:          app.Scope,
+		Store:          newFakeStore(),
+		SessionBrowser: newFakeSessionBrowser(),
+	})
+	app.Manager = mgr
+
+	origID := app.Scope.SessionID()
+	app.cmdSessionNew(context.Background())
+
+	if app.Scope.SessionID() == origID {
+		t.Error("expected session ID to change after cmdSessionNew")
+	}
+}
+
+func TestCmdSessionList_ListError(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+	sb := newFakeSessionBrowser()
+	sb.listErr = fmt.Errorf("db connection failed")
+	app.Sessions = sb
+
+	app.cmdSessionList(context.Background())
+
+	if !strings.Contains(p.ErrOutput(), "db connection failed") {
+		t.Errorf("expected error message in output, got: %s", p.ErrOutput())
+	}
+}
+
+func TestCmdSessionList_SwitchWithManager(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+	sb := newFakeSessionBrowser()
+	sb.sessions = []domain.SessionSummary{
+		{ID: "target-000-0000-0000-000000000000", Title: "target"},
+	}
+	app.Sessions = sb
+	app.LR = newScriptReader("1")
+	mgr := domain.NewConversationManager(domain.ConversationManagerConfig{
+		Scope:          app.Scope,
+		Store:          newFakeStore(),
+		SessionBrowser: newFakeSessionBrowser(),
+	})
+	app.Manager = mgr
+
+	app.cmdSessionList(context.Background())
+
+	if app.Scope.SessionID() != "target-000-0000-0000-000000000000" {
+		t.Errorf("expected session to switch, got: %s", app.Scope.SessionID())
+	}
+}
+
+func TestCmdSessionList_SwitchUntitledSession(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+	sb := newFakeSessionBrowser()
+	sb.sessions = []domain.SessionSummary{
+		{ID: "untitled-00-0000-0000-000000000000", Title: ""},
+	}
+	app.Sessions = sb
+	app.LR = newScriptReader("1")
+
+	app.cmdSessionList(context.Background())
+
+	if !strings.Contains(p.Output(), "Switched to session") {
+		t.Errorf("expected switch message, got: %s", p.Output())
+	}
+}
+
+func TestCmdSessionRemove_ListError(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+	sb := newFakeSessionBrowser()
+	sb.listErr = fmt.Errorf("storage unavailable")
+	app.Sessions = sb
+
+	app.cmdSessionRemove(context.Background())
+
+	if !strings.Contains(p.ErrOutput(), "storage unavailable") {
+		t.Errorf("expected error in output, got: %s", p.ErrOutput())
+	}
+}
+
+func TestCmdSessionRemove_DeleteError(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+	sb := newFakeSessionBrowser()
+	sb.sessions = []domain.SessionSummary{
+		{ID: app.Scope.SessionID(), Title: "current"},
+		{ID: "other-0000-0000-0000-000000000000", Title: "other"},
+	}
+	sb.deleteErr = fmt.Errorf("delete failed")
+	app.Sessions = sb
+	app.LR = newScriptReader("2")
+
+	app.cmdSessionRemove(context.Background())
+
+	if !strings.Contains(p.ErrOutput(), "delete failed") {
+		t.Errorf("expected delete error in output, got: %s", p.ErrOutput())
+	}
+}
+
+func TestCmdSessionRemove_UntitledSession(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+	sb := newFakeSessionBrowser()
+	sb.sessions = []domain.SessionSummary{
+		{ID: app.Scope.SessionID(), Title: "current"},
+		{ID: "other-0000-0000-0000-000000000000", Title: ""},
+	}
+	app.Sessions = sb
+	app.LR = newScriptReader("2")
+
+	app.cmdSessionRemove(context.Background())
+
+	if !strings.Contains(p.Output(), "Removed session") {
+		t.Errorf("expected removal message, got: %s", p.Output())
+	}
+}
+
+func TestCmdMemory_LoadError(t *testing.T) {
+	p := &spyPrinter{}
+	app := newTestApp(p)
+	sb := newFakeSessionBrowser()
+	sb.loadErr = fmt.Errorf("history unavailable")
+	app.Sessions = sb
+
+	app.cmdMemory(context.Background())
+
+	if !strings.Contains(p.ErrOutput(), "history unavailable") {
+		t.Errorf("expected load error in output, got: %s", p.ErrOutput())
 	}
 }

@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -232,5 +233,109 @@ func TestNewServer(t *testing.T) {
 
 	if s == nil {
 		t.Fatal("expected non-nil server")
+	}
+}
+
+func TestWithBaseEnvHTTPSecurity(t *testing.T) {
+	env := BaseEnv{
+		HTTPRateLimit:    100,
+		HTTPRateBurst:    200,
+		HTTPReadTimeout:  5 * time.Second,
+		HTTPWriteTimeout: 15 * time.Second,
+		HTTPIdleTimeout:  30 * time.Second,
+	}
+	app := NewApp("test", "1.0.0", WithBaseEnvHTTPSecurity(env))
+
+	if app.security == nil {
+		t.Fatal("expected security to be configured")
+	}
+	if app.security.RateLimit != 100 {
+		t.Errorf("expected RateLimit 100, got %d", app.security.RateLimit)
+	}
+	if app.security.RateBurst != 200 {
+		t.Errorf("expected RateBurst 200, got %d", app.security.RateBurst)
+	}
+	if app.security.ReadTimeout != 5*time.Second {
+		t.Errorf("expected ReadTimeout 5s, got %v", app.security.ReadTimeout)
+	}
+}
+
+func TestWithBaseEnvAuth_APIKeyOnly(t *testing.T) {
+	env := BaseEnv{APIKey: "my-key"}
+	opts := WithBaseEnvAuth(env)
+
+	if len(opts) != 1 {
+		t.Fatalf("expected 1 option, got %d", len(opts))
+	}
+	app := NewApp("test", "1.0.0", opts...)
+	if app.apiKey == nil || *app.apiKey != "my-key" {
+		t.Error("expected API key to be set")
+	}
+}
+
+func TestWithBaseEnvAuth_OAuthOnly(t *testing.T) {
+	env := BaseEnv{
+		OAuthAuthorizationServer: "https://auth.example.com",
+		OAuthAudience:            "my-api",
+		OAuthScopes:              "read,write",
+	}
+	opts := WithBaseEnvAuth(env)
+
+	if len(opts) != 1 {
+		t.Fatalf("expected 1 option, got %d", len(opts))
+	}
+	app := NewApp("test", "1.0.0", opts...)
+	if app.oauth == nil {
+		t.Fatal("expected OAuth to be configured")
+	}
+	if app.oauth.AuthorizationServerURL != "https://auth.example.com" {
+		t.Errorf("unexpected AuthorizationServerURL: %s", app.oauth.AuthorizationServerURL)
+	}
+	if app.oauth.ASProxy == nil {
+		t.Error("expected ASProxy to be set when audience is configured")
+	}
+}
+
+func TestWithBaseEnvAuth_Neither(t *testing.T) {
+	env := BaseEnv{}
+	opts := WithBaseEnvAuth(env)
+
+	if len(opts) != 0 {
+		t.Errorf("expected 0 options for empty env, got %d", len(opts))
+	}
+}
+
+func TestRegisterTool_HandlerInvoked(t *testing.T) {
+	tr := RegisterTool(mockTool{})
+	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0.1"}, nil)
+	tr.Register(s)
+
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	go func() { _ = s.Run(ctx, serverTransport) }()
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.1"}, nil)
+	session, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	raw, err := json.Marshal(mockInput{Value: 21})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "mock-tool",
+		Arguments: json.RawMessage(raw),
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
 	}
 }

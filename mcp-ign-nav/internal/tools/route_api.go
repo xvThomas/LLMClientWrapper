@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -45,10 +44,6 @@ func (c *routeClient) callRouteAPI(ctx context.Context, params routeParams) (*ro
 
 	var result routeAPIResponse
 	if err := c.postJSON(ctx, "/itineraire", body, &result); err != nil {
-		var errResp routeErrorResponse
-		if decErr := json.Unmarshal([]byte(err.Error()), &errResp); decErr == nil && errResp.Error.Message != "" {
-			return nil, fmt.Errorf("API error (status %d): %s", http.StatusBadRequest, errResp.Error.Message)
-		}
 		return nil, err
 	}
 

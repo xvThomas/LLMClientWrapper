@@ -277,6 +277,49 @@ func TestForecast5Days3HoursWeatherTool_Call_WithPrecipitation(t *testing.T) {
 	}
 }
 
+func TestForecast5Days3HoursWeatherTool_Call_WithSnow(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		payload := `{
+			"cod": "200",
+			"cnt": 1,
+			"list": [{
+				"dt": 1711360800,
+				"main": {"temp": -3.0, "feels_like": -6.5, "temp_min": -4.0, "temp_max": -2.0, "pressure": 1020, "humidity": 85},
+				"weather": [{"id": 601, "main": "Snow", "description": "snow", "icon": "13d"}],
+				"clouds": {"all": 90},
+				"wind": {"speed": 3.0, "deg": 270},
+				"snow": {"3h": 1.2},
+				"visibility": 2000,
+				"pop": 0.95,
+				"dt_txt": "2024-03-25 09:00:00"
+			}],
+			"city": {"id": 123, "name": "Oslo", "coord": {"lat": 59.9133, "lon": 10.7389}, "country": "NO", "timezone": 3600, "sunrise": 1711341600, "sunset": 1711387200}
+		}`
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(payload))
+	}))
+	defer srv.Close()
+
+	tool := newForecast5Days3HoursWeatherToolWithBaseURL("testkey", srv.URL, srv.Client())
+	result, err := tool.Call(context.Background(), ForecastToolInput{Lat: 59.9133, Lon: 10.7389})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Forecasts) != 1 {
+		t.Fatalf("expected 1 forecast, got %d", len(result.Forecasts))
+	}
+	f := result.Forecasts[0]
+	if f.Snow == nil {
+		t.Fatal("expected Snow to be non-nil")
+	}
+	if *f.Snow != 1.2 {
+		t.Errorf("expected Snow 1.2, got %f", *f.Snow)
+	}
+	if f.Precipitation != nil {
+		t.Errorf("expected Precipitation to be nil, got %v", f.Precipitation)
+	}
+}
+
 func TestForecast5Days3HoursWeatherTool_Integration(t *testing.T) {
 	projectRoot := testutils.GetProjectRoot()
 	_ = godotenv.Load(
