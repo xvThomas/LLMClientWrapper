@@ -373,3 +373,65 @@ func TestRouteTool_Call_NoAvoidHighways(t *testing.T) {
 		t.Errorf("expected no constraints, got %d", len(receivedReq.Constraints))
 	}
 }
+
+func TestRouteTool_Call_WithLabels(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := routeAPIResponse{
+			Start: "2.337325,48.84932", End: "2.367842,48.85278",
+			Profile: "car", Optimization: "fastest",
+			Distance: 100, Duration: 50, Bbox: []float64{0, 0, 1, 1},
+			Geometry: &GeoJSONGeometry{Type: "LineString", Coordinates: [][]float64{{0, 0}, {1, 1}}},
+			Portions: []routeAPIPortion{{Start: "a", End: "b", Distance: 100, Duration: 50}},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
+	result, err := tool.Call(context.Background(), RouteToolInput{
+		Start:      "2.337306,48.849319",
+		End:        "2.367776,48.852891",
+		StartLabel: "Paris",
+		EndLabel:   "Lyon",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.StartLabel != "Paris" {
+		t.Errorf("expected StartLabel %q, got %q", "Paris", result.StartLabel)
+	}
+	if result.EndLabel != "Lyon" {
+		t.Errorf("expected EndLabel %q, got %q", "Lyon", result.EndLabel)
+	}
+}
+
+func TestRouteTool_Call_WithoutLabels(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := routeAPIResponse{
+			Start: "2.337325,48.84932", End: "2.367842,48.85278",
+			Profile: "car", Optimization: "fastest",
+			Distance: 100, Duration: 50, Bbox: []float64{0, 0, 1, 1},
+			Geometry: &GeoJSONGeometry{Type: "LineString", Coordinates: [][]float64{{0, 0}, {1, 1}}},
+			Portions: []routeAPIPortion{{Start: "a", End: "b", Distance: 100, Duration: 50}},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
+	result, err := tool.Call(context.Background(), RouteToolInput{
+		Start: "2.337306,48.849319",
+		End:   "2.367776,48.852891",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.StartLabel != "" {
+		t.Errorf("expected empty StartLabel, got %q", result.StartLabel)
+	}
+	if result.EndLabel != "" {
+		t.Errorf("expected empty EndLabel, got %q", result.EndLabel)
+	}
+}
