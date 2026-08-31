@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	prompt "github.com/c-bata/go-prompt"
+	prompt "github.com/elk-language/go-prompt"
 )
 
 func TestCommandSuggestionsTopLevel(t *testing.T) {
@@ -90,7 +90,7 @@ func TestStripANSI(t *testing.T) {
 
 func TestGoPromptReaderComplete(t *testing.T) {
 	gr := &GoPromptReader{}
-	suggestions := gr.complete(*prompt.NewDocument())
+	suggestions, _, _ := gr.complete(*prompt.NewDocument())
 	if suggestions != nil {
 		t.Fatalf("expected nil suggestions for empty doc, got: %+v", suggestions)
 	}

@@ -127,15 +127,15 @@ func (a *App) buildMCPAuthConfig(cfg *mcp.ServerConfig) bool {
 	case mcp.AuthTypeNone:
 		// No credentials needed.
 	case mcp.AuthTypeAPIKey:
-		key, err := a.LR.ReadLine("API Key: ")
+		key, err := a.LR.ReadLineRaw("API Key: ")
 		if err != nil {
 			a.Println(yellow(cancelled))
 			return false
 		}
 		cfg.APIKey = strings.TrimSpace(key)
 	case mcp.AuthTypeOAuth:
-		clientID, _ := a.LR.ReadLine("Client ID: ")
-		clientSecret, _ := a.LR.ReadLine("Client Secret: ")
+		clientID, _ := a.LR.ReadLineRaw("Client ID: ")
+		clientSecret, _ := a.LR.ReadLineRaw("Client Secret: ")
 		tokenURL, _ := a.LR.ReadLine("Token URL: ")
 		scopes, _ := a.LR.ReadLine("Scopes (comma-separated): ")
 		cfg.OAuth = &mcp.OAuthConfig{

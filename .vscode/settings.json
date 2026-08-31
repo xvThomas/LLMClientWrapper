@@ -3,6 +3,7 @@
   "cSpell.language": "en,fr",
   "cSpell.words": [
     "AIAPI",
+    "ansi",
     "bbox",
     "bdtopo",
     "Errorf",
@@ -11,6 +12,7 @@
     "golangci",
     "Grnd",
     "inmemory",
+    "istrings",
     "itineraire",
     "joho",
     "jwks",

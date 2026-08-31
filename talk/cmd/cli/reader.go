@@ -9,7 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	prompt "github.com/c-bata/go-prompt"
+	prompt "github.com/elk-language/go-prompt"
+	istrings "github.com/elk-language/go-prompt/strings"
 	"golang.org/x/term"
 )
 
@@ -18,6 +19,9 @@ var ansiEscapeSequence = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 // Reader abstracts line input for testability.
 type Reader interface {
 	ReadLine(prompt string) (string, error)
+	// ReadLineRaw reads input using plain stdio, bypassing go-prompt.
+	// Use for values that may contain special characters (API keys, secrets).
+	ReadLineRaw(prompt string) (string, error)
 }
 
 var topLevelCommandSuggestions = []prompt.Suggest{
@@ -95,11 +99,11 @@ func (gr *GoPromptReader) ReadLine(promptText string) (string, error) {
 
 	p := prompt.New(
 		func(string) {}, // callback for when user input is received
-		gr.complete,
-		prompt.OptionPrefix(stripANSI(promptText)),
-		prompt.OptionHistory(gr.historyEntries),
-		prompt.OptionMaxSuggestion(10),
-		prompt.OptionAddKeyBind(
+		prompt.WithCompleter(gr.complete),
+		prompt.WithPrefix(stripANSI(promptText)),
+		prompt.WithHistory(gr.historyEntries),
+		prompt.WithMaxSuggestion(10),
+		prompt.WithKeyBind(
 			prompt.KeyBind{Key: prompt.ControlA, Fn: prompt.GoLineBeginning},
 			prompt.KeyBind{Key: prompt.ControlE, Fn: prompt.GoLineEnd},
 		),
@@ -120,8 +124,11 @@ func stripANSI(text string) string {
 	return ansiEscapeSequence.ReplaceAllString(text, "")
 }
 
-func (gr *GoPromptReader) complete(doc prompt.Document) []prompt.Suggest {
-	return commandSuggestions(doc.TextBeforeCursor())
+func (gr *GoPromptReader) complete(doc prompt.Document) ([]prompt.Suggest, istrings.RuneNumber, istrings.RuneNumber) {
+	endIndex := doc.CurrentRuneIndex()
+	w := doc.GetWordBeforeCursor()
+	startIndex := endIndex - istrings.RuneNumber(len([]rune(w)))
+	return commandSuggestions(doc.TextBeforeCursor()), startIndex, endIndex
 }
 
 func commandSuggestions(beforeCursor string) []prompt.Suggest {
@@ -198,6 +205,11 @@ func loadHistoryEntries(path string) ([]string, error) {
 	}
 
 	return entries, nil
+}
+
+// ReadLineRaw reads one line using plain stdio, bypassing go-prompt.
+func (gr *GoPromptReader) ReadLineRaw(promptText string) (string, error) {
+	return readLineFallback(promptText)
 }
 
 func readLineFallback(promptText string) (string, error) {

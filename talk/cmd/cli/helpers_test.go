@@ -41,6 +41,10 @@ func (s *scriptReader) ReadLine(_ string) (string, error) {
 	return ans, nil
 }
 
+func (s *scriptReader) ReadLineRaw(prompt string) (string, error) {
+	return s.ReadLine(prompt)
+}
+
 // stubPromptProvider returns a fixed system prompt or error.
 type stubPromptProvider struct {
 	text string
