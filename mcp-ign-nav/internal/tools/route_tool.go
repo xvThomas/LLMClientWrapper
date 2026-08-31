@@ -20,8 +20,6 @@ type RouteToolInput struct {
 	Optimization  string   `json:"optimization,omitempty" description:"Optimization criterion: 'fastest' or 'shortest'. Defaults to 'fastest'."`
 	Intermediates []string `json:"intermediates,omitempty" description:"Ordered list of intermediate waypoints as 'longitude,latitude' strings"`
 	AvoidHighways string   `json:"avoidHighways,omitempty" description:"Set to 'true' to avoid highways (autoroutes). Defaults to empty (no avoidance)."`
-	StartLabel    string   `json:"startLabel,omitempty" description:"Human-readable name of the starting point (e.g. 'Paris'). Populate with the place name resolved during prior geocoding."`
-	EndLabel      string   `json:"endLabel,omitempty" description:"Human-readable name of the destination (e.g. 'Lyon'). Populate with the place name resolved during prior geocoding."`
 }
 
 // RouteStep represents a single navigation step (turn-by-turn instruction).
@@ -63,8 +61,6 @@ type RouteToolOutput struct {
 	Bbox         [4]float64       `json:"bbox" description:"Bounding box [minLon, minLat, maxLon, maxLat]"`
 	Geometry     *GeoJSONGeometry `json:"geometry" description:"Route geometry as a GeoJSON LineString"`
 	Portions     []RoutePortion   `json:"portions" description:"Route portions between waypoints"`
-	StartLabel   string           `json:"startLabel,omitempty" description:"Human-readable name of the starting point, echoed from input"`
-	EndLabel     string           `json:"endLabel,omitempty" description:"Human-readable name of the destination, echoed from input"`
 }
 
 // RouteTool implements mcpserver.MCPTool for route calculation via the IGN Navigation API.
@@ -148,8 +144,6 @@ func (t *RouteTool) Call(ctx context.Context, input RouteToolInput) (RouteToolOu
 		Bbox:         bbox,
 		Geometry:     result.Geometry,
 		Portions:     portions,
-		StartLabel:   input.StartLabel,
-		EndLabel:     input.EndLabel,
 	}, nil
 }
 
