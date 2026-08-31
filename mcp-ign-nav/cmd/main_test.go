@@ -35,14 +35,6 @@ func TestBuildApp_WithOAuth(t *testing.T) {
 	}
 }
 
-func TestBuildApp_WithGeoJSONGeometry(t *testing.T) {
-	env := &config.ServerEnv{GetGeoJSONGeometry: true}
-	app := buildApp(env)
-	if app == nil {
-		t.Fatal("expected non-nil app")
-	}
-}
-
 func TestBuildApp_ReturnsCorrectType(t *testing.T) {
 	env := &config.ServerEnv{}
 	app := buildApp(env)

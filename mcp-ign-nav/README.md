@@ -47,7 +47,7 @@ Returns a list of matching locations, each with: label, city, postcode, street, 
 
 ### `route`
 
-Calculate a route between two points in France using the IGN Navigation API. Returns distance, duration, turn-by-turn steps, and optionally GeoJSON geometry.
+Calculate a route between two points in France using the IGN Navigation API. Returns distance, duration, turn-by-turn steps, and GeoJSON geometry.
 
 **Input:**
 
@@ -63,7 +63,7 @@ Calculate a route between two points in France using the IGN Navigation API. Ret
 
 **Output:**
 
-Returns: start, end, profile, optimization, total distance (m), total duration (s), bounding box, route portions with turn-by-turn steps (instruction, modifier, road name, road number, distance, duration), and optionally GeoJSON LineString geometry (when `GET_GEOJSON_GEOMETRY=true`).
+Returns: start, end, profile, optimization, total distance (m), total duration (s), bounding box, GeoJSON LineString geometry, and route portions with turn-by-turn steps (instruction, modifier, road name, road number, distance, duration).
 
 ## Configuration
 
@@ -79,11 +79,6 @@ Optional environment variables (for MCP authentication, not for the IGN API):
 | `MCP_OAUTH_SCOPES`           | Comma-separated OAuth scopes         |
 | `MCP_BASE_URL`               | Public base URL of this server       |
 
-Optional environment variables (tool behavior):
-
-| Variable                | Default | Description                                                        |
-|-------------------------|---------|--------------------------------------------------------------------|
-| `GET_GEOJSON_GEOMETRY`  | `false` | When `true`, the route tool returns the full GeoJSON LineString geometry |
 
 ## Build & Run
 

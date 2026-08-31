@@ -12,7 +12,7 @@ import (
 )
 
 func TestRouteTool_Metadata(t *testing.T) {
-	tool := NewRouteTool(rate.NewLimiter(rate.Inf, 0), false)
+	tool := NewRouteTool(rate.NewLimiter(rate.Inf, 0))
 	if tool.Name() != "route" {
 		t.Errorf("unexpected tool name: %q", tool.Name())
 	}
@@ -62,6 +62,10 @@ func TestRouteTool_Call_Success(t *testing.T) {
 			Distance:     2562.9,
 			Duration:     581.1,
 			Bbox:         []float64{2.337325, 48.848823, 2.367842, 48.85278},
+			Geometry: &GeoJSONGeometry{
+				Type:        "LineString",
+				Coordinates: [][]float64{{2.337325, 48.84932}, {2.367842, 48.85278}},
+			},
 			Portions: []routeAPIPortion{
 				{
 					Start:    "2.337325,48.84932",
@@ -98,7 +102,7 @@ func TestRouteTool_Call_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tool := newRouteToolWithBaseURL(srv.URL, srv.Client(), true)
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
 	result, err := tool.Call(context.Background(), RouteToolInput{
 		Start: "2.337306,48.849319",
 		End:   "2.367776,48.852891",
@@ -148,6 +152,12 @@ func TestRouteTool_Call_Success(t *testing.T) {
 	if result.Portions[0].Steps[1].End != "2.3392,48.8505" {
 		t.Errorf("unexpected step 1 end: %q", result.Portions[0].Steps[1].End)
 	}
+	if result.Geometry == nil {
+		t.Fatal("expected geometry to be non-nil")
+	}
+	if result.Geometry.Type != "LineString" {
+		t.Errorf("unexpected geometry type: %q", result.Geometry.Type)
+	}
 }
 
 func TestRouteTool_Call_WithIntermediates(t *testing.T) {
@@ -164,6 +174,10 @@ func TestRouteTool_Call_WithIntermediates(t *testing.T) {
 			Distance:     2563.0,
 			Duration:     581.1,
 			Bbox:         []float64{2.337325, 48.848823, 2.367842, 48.85278},
+			Geometry: &GeoJSONGeometry{
+				Type:        "LineString",
+				Coordinates: [][]float64{{2.337325, 48.84932}, {2.367842, 48.85278}},
+			},
 			Portions: []routeAPIPortion{
 				{Start: "2.337325,48.84932", End: "2.349861,48.84976", Distance: 1159.4, Duration: 280.7},
 				{Start: "2.349861,48.84976", End: "2.367842,48.85278", Distance: 1403.6, Duration: 300.4},
@@ -174,7 +188,7 @@ func TestRouteTool_Call_WithIntermediates(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tool := newRouteToolWithBaseURL(srv.URL, srv.Client(), false)
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
 	result, err := tool.Call(context.Background(), RouteToolInput{
 		Start:         "2.337306,48.849319",
 		End:           "2.367776,48.852891",
@@ -192,7 +206,7 @@ func TestRouteTool_Call_WithIntermediates(t *testing.T) {
 }
 
 func TestRouteTool_Call_MissingStart(t *testing.T) {
-	tool := NewRouteTool(rate.NewLimiter(rate.Inf, 0), false)
+	tool := NewRouteTool(rate.NewLimiter(rate.Inf, 0))
 	_, err := tool.Call(context.Background(), RouteToolInput{End: "2.367776,48.852891"})
 	if err == nil {
 		t.Error("expected error for missing start")
@@ -200,10 +214,33 @@ func TestRouteTool_Call_MissingStart(t *testing.T) {
 }
 
 func TestRouteTool_Call_MissingEnd(t *testing.T) {
-	tool := NewRouteTool(rate.NewLimiter(rate.Inf, 0), false)
+	tool := NewRouteTool(rate.NewLimiter(rate.Inf, 0))
 	_, err := tool.Call(context.Background(), RouteToolInput{Start: "2.337306,48.849319"})
 	if err == nil {
 		t.Error("expected error for missing end")
+	}
+}
+
+func TestRouteTool_Call_NilGeometry(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := routeAPIResponse{
+			Start: "2.337325,48.84932", End: "2.367842,48.85278",
+			Profile: "car", Optimization: "fastest",
+			Distance: 100, Duration: 50, Bbox: []float64{0, 0, 1, 1},
+			Portions: []routeAPIPortion{{Start: "a", End: "b", Distance: 100, Duration: 50}},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
+	_, err := tool.Call(context.Background(), RouteToolInput{
+		Start: "2.337306,48.849319",
+		End:   "2.367776,48.852891",
+	})
+	if err == nil {
+		t.Error("expected error when API returns no geometry")
 	}
 }
 
@@ -216,7 +253,7 @@ func TestRouteTool_Call_APIError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tool := newRouteToolWithBaseURL(srv.URL, srv.Client(), false)
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
 	_, err := tool.Call(context.Background(), RouteToolInput{
 		Start: "2.337306,48.849319",
 		End:   "2.367776,48.852891",
@@ -236,6 +273,7 @@ func TestRouteTool_Call_Defaults(t *testing.T) {
 			Start: "2.337325,48.84932", End: "2.367842,48.85278",
 			Profile: "car", Optimization: "fastest",
 			Distance: 100, Duration: 50, Bbox: []float64{0, 0, 1, 1},
+			Geometry: &GeoJSONGeometry{Type: "LineString", Coordinates: [][]float64{{0, 0}, {1, 1}}},
 			Portions: []routeAPIPortion{{Start: "a", End: "b", Distance: 100, Duration: 50}},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -243,7 +281,7 @@ func TestRouteTool_Call_Defaults(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tool := newRouteToolWithBaseURL(srv.URL, srv.Client(), false)
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
 	_, _ = tool.Call(context.Background(), RouteToolInput{
 		Start: "2.337306,48.849319",
 		End:   "2.367776,48.852891",
@@ -270,6 +308,7 @@ func TestRouteTool_Call_AvoidHighways(t *testing.T) {
 			Start: "2.337325,48.84932", End: "2.367842,48.85278",
 			Profile: "car", Optimization: "fastest",
 			Distance: 3000, Duration: 900, Bbox: []float64{0, 0, 1, 1},
+			Geometry: &GeoJSONGeometry{Type: "LineString", Coordinates: [][]float64{{0, 0}, {1, 1}}},
 			Portions: []routeAPIPortion{{Start: "a", End: "b", Distance: 3000, Duration: 900}},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -277,7 +316,7 @@ func TestRouteTool_Call_AvoidHighways(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tool := newRouteToolWithBaseURL(srv.URL, srv.Client(), false)
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
 	_, err := tool.Call(context.Background(), RouteToolInput{
 		Start:         "2.337306,48.849319",
 		End:           "2.367776,48.852891",
@@ -314,6 +353,7 @@ func TestRouteTool_Call_NoAvoidHighways(t *testing.T) {
 			Start: "2.337325,48.84932", End: "2.367842,48.85278",
 			Profile: "car", Optimization: "fastest",
 			Distance: 100, Duration: 50, Bbox: []float64{0, 0, 1, 1},
+			Geometry: &GeoJSONGeometry{Type: "LineString", Coordinates: [][]float64{{0, 0}, {1, 1}}},
 			Portions: []routeAPIPortion{{Start: "a", End: "b", Distance: 100, Duration: 50}},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -321,7 +361,7 @@ func TestRouteTool_Call_NoAvoidHighways(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tool := newRouteToolWithBaseURL(srv.URL, srv.Client(), false)
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
 	_, err := tool.Call(context.Background(), RouteToolInput{
 		Start: "2.337306,48.849319",
 		End:   "2.367776,48.852891",

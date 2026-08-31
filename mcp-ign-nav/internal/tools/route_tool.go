@@ -65,26 +65,22 @@ type RouteToolOutput struct {
 
 // RouteTool implements mcpserver.MCPTool for route calculation via the IGN Navigation API.
 type RouteTool struct {
-	client      *routeClient
-	getGeometry bool
+	client *routeClient
 }
 
 var _ mcpserver.MCPTool[RouteToolInput, RouteToolOutput] = (*RouteTool)(nil)
 
 // NewRouteTool creates a RouteTool using the IGN Navigation API.
-// When getGeometry is true, the route GeoJSON geometry is requested and returned.
-func NewRouteTool(limiter *rate.Limiter, getGeometry bool) *RouteTool {
+func NewRouteTool(limiter *rate.Limiter) *RouteTool {
 	return &RouteTool{
-		client:      newRouteClient(navigationBaseURL, &http.Client{Timeout: httpClientTimeout}, limiter),
-		getGeometry: getGeometry,
+		client: newRouteClient(navigationBaseURL, &http.Client{Timeout: httpClientTimeout}, limiter),
 	}
 }
 
 // newRouteToolWithBaseURL creates a RouteTool with a custom base URL (for testing).
-func newRouteToolWithBaseURL(baseURL string, httpClient *http.Client, getGeometry bool) *RouteTool {
+func newRouteToolWithBaseURL(baseURL string, httpClient *http.Client) *RouteTool {
 	return &RouteTool{
-		client:      newRouteClient(baseURL, httpClient, rate.NewLimiter(rate.Inf, 0)),
-		getGeometry: getGeometry,
+		client: newRouteClient(baseURL, httpClient, rate.NewLimiter(rate.Inf, 0)),
 	}
 }
 
@@ -108,7 +104,7 @@ func (t *RouteTool) Call(ctx context.Context, input RouteToolInput) (RouteToolOu
 		Intermediates: input.Intermediates,
 		AvoidHighways: input.AvoidHighways,
 		GetSteps:      true,
-		GetGeometry:   t.getGeometry,
+		GetGeometry:   true,
 	})
 	if err != nil {
 		return RouteToolOutput{}, err
@@ -134,9 +130,8 @@ func (t *RouteTool) Call(ctx context.Context, input RouteToolInput) (RouteToolOu
 		copy(bbox[:], result.Bbox)
 	}
 
-	var geometry *GeoJSONGeometry
-	if t.getGeometry {
-		geometry = result.Geometry
+	if result.Geometry == nil {
+		return RouteToolOutput{}, fmt.Errorf("route API returned no geometry")
 	}
 
 	return RouteToolOutput{
@@ -147,7 +142,7 @@ func (t *RouteTool) Call(ctx context.Context, input RouteToolInput) (RouteToolOu
 		Distance:     result.Distance,
 		Duration:     result.Duration,
 		Bbox:         bbox,
-		Geometry:     geometry,
+		Geometry:     result.Geometry,
 		Portions:     portions,
 	}, nil
 }
