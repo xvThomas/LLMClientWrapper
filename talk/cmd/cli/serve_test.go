@@ -115,7 +115,7 @@ func TestRunServeGracefulShutdown(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runServe(ctx, "0") // port 0 = random available port
+		errCh <- runServe(ctx, "0", defaultSystemPromptPath()) // port 0 = random available port
 	}()
 
 	// Give the server time to start.

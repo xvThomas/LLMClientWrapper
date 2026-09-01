@@ -131,6 +131,9 @@ func (t *RouteTool) Call(ctx context.Context, input RouteToolInput) (RouteToolOu
 	}
 
 	if result.Geometry == nil {
+		result.Geometry = geometryFromSteps(result.Portions)
+	}
+	if result.Geometry == nil {
 		return RouteToolOutput{}, fmt.Errorf("route API returned no geometry")
 	}
 
@@ -145,6 +148,30 @@ func (t *RouteTool) Call(ctx context.Context, input RouteToolInput) (RouteToolOu
 		Geometry:     result.Geometry,
 		Portions:     portions,
 	}, nil
+}
+
+// geometryFromSteps builds a LineString by concatenating all step geometries.
+// Used as a fallback when the IGN OSRM endpoint returns null for the top-level geometry.
+func geometryFromSteps(portions []routeAPIPortion) *GeoJSONGeometry {
+	var coords [][]float64
+	for _, p := range portions {
+		for _, s := range p.Steps {
+			if s.Geometry == nil {
+				continue
+			}
+			for i, c := range s.Geometry.Coordinates {
+				// Skip the first point of each step: it is the last point of the previous step.
+				if i == 0 && len(coords) > 0 {
+					continue
+				}
+				coords = append(coords, c)
+			}
+		}
+	}
+	if len(coords) == 0 {
+		return nil
+	}
+	return &GeoJSONGeometry{Type: "LineString", Coordinates: coords}
 }
 
 // convertRouteStep converts a single routeAPIStep to a RouteStep.

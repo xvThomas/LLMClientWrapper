@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "talk serve",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/talk/cmd/cli",
+            "args": ["serve", "--system-file", "./system_prompt.md"],
+            "cwd": "${workspaceFolder}/talk",
+            "buildFlags": "-tags debug"
+        }
+    ]
+}

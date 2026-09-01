@@ -373,6 +373,49 @@ func TestToolAdapter_Execute_Success(t *testing.T) {
 	}
 }
 
+func TestToolAdapter_Execute_JSONOutput(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "test-server", Version: "v0.0.1"}, nil)
+	server.AddTool(&mcp.Tool{
+		Name:        "route",
+		Description: "returns route JSON",
+		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+	}, func(_ context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		payload := `{"start":"2.33,48.84","end":"2.37,48.85","geometry":{"type":"LineString","coordinates":[[2.33,48.84],[2.37,48.85]]}}`
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: payload}}}, nil
+	})
+
+	session := connectInMemorySession(t, server)
+	defer func() { _ = session.Close() }()
+
+	adapter := &mcpToolAdapter{
+		manager:    NewManager(&stubRegistry{}),
+		serverID:   "srv-1",
+		serverName: "test-server",
+		tool:       mcpTool("route", "returns route JSON", nil),
+	}
+	adapter.manager.sessions["srv-1"] = session
+
+	got, err := adapter.Execute(context.Background(), map[string]any{})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	// JSON output is returned parsed — geometry must be accessible without unwrapping.
+	if _, ok := got["geometry"]; !ok {
+		t.Fatalf("Execute() result missing 'geometry' key; got keys: %v", keySet(got))
+	}
+	if _, hasContent := got["content"]; hasContent {
+		t.Fatalf("Execute() must not wrap JSON output in {\"content\": ...}")
+	}
+}
+
+func keySet(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 func TestToolAdapter_Execute_ToolError(t *testing.T) {
 	server := mcp.NewServer(&mcp.Implementation{Name: "test-server", Version: "v0.0.1"}, nil)
 	server.AddTool(&mcp.Tool{

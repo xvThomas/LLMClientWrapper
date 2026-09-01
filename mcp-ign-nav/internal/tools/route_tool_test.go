@@ -221,6 +221,60 @@ func TestRouteTool_Call_MissingEnd(t *testing.T) {
 	}
 }
 
+func TestRouteTool_Call_GeometryFromSteps(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := routeAPIResponse{
+			Start: "2.33,48.84", End: "2.37,48.85",
+			Profile: "car", Optimization: "fastest",
+			Distance: 4000, Duration: 600, Bbox: []float64{2.33, 48.84, 2.37, 48.85},
+			// Geometry intentionally absent (nil) — simulates bdtopo-osrm behavior.
+			Portions: []routeAPIPortion{{
+				Start: "2.33,48.84", End: "2.37,48.85", Distance: 4000, Duration: 600,
+				Steps: []routeAPIStep{
+					{
+						Distance: 2000, Duration: 300,
+						Instruction: routeAPIInstruction{Type: "depart"},
+						Geometry: &GeoJSONGeometry{
+							Type:        "LineString",
+							Coordinates: [][]float64{{2.33, 48.84}, {2.35, 48.845}},
+						},
+					},
+					{
+						Distance: 2000, Duration: 300,
+						Instruction: routeAPIInstruction{Type: "arrive"},
+						Geometry: &GeoJSONGeometry{
+							Type:        "LineString",
+							Coordinates: [][]float64{{2.35, 48.845}, {2.37, 48.85}},
+						},
+					},
+				},
+			}},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	tool := newRouteToolWithBaseURL(srv.URL, srv.Client())
+	result, err := tool.Call(context.Background(), RouteToolInput{
+		Start: "2.33,48.84",
+		End:   "2.37,48.85",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Geometry == nil {
+		t.Fatal("expected geometry to be built from step geometries")
+	}
+	if result.Geometry.Type != "LineString" {
+		t.Errorf("geometry type = %q, want LineString", result.Geometry.Type)
+	}
+	// 3 unique points: [2.33,48.84], [2.35,48.845], [2.37,48.85] — first of step 2 is deduplicated.
+	if len(result.Geometry.Coordinates) != 3 {
+		t.Errorf("got %d coordinates, want 3", len(result.Geometry.Coordinates))
+	}
+}
+
 func TestRouteTool_Call_NilGeometry(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := routeAPIResponse{

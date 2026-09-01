@@ -71,8 +71,6 @@ func (h *Handler) parseRequest(w http.ResponseWriter, r *http.Request) (types.Ru
 		return input, false
 	}
 
-	h.log.Info("Received /agent request", "input", input)
-
 	if len(input.Messages) == 0 && len(input.Resume) == 0 {
 		http.Error(w, `{"error":"messages field is required"}`, http.StatusBadRequest)
 		return input, false

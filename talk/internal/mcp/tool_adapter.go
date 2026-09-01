@@ -89,7 +89,12 @@ func (a *mcpToolAdapter) Execute(ctx context.Context, input map[string]any) (map
 	if result.IsError {
 		return nil, fmt.Errorf("tool %q returned error: %s", a.tool.Name, extractTextContent(result.Content))
 	}
-	return map[string]any{"content": extractTextContent(result.Content)}, nil
+	text := extractTextContent(result.Content)
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(text), &parsed); err == nil {
+		return parsed, nil
+	}
+	return map[string]any{"content": text}, nil
 }
 
 // extractTextContent concatenates text content from an MCP tool result.

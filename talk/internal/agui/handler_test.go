@@ -405,23 +405,24 @@ func TestHandler_ToolCallEventsInSSEStream(t *testing.T) {
 	evts := parseSSEEvents(t, rec.Body.Bytes())
 
 	// Expected sequence:
-	// RUN_STARTED, TOOL_CALL_START, TOOL_CALL_ARGS, TOOL_CALL_END,
+	// RUN_STARTED, TOOL_CALL_START, TOOL_CALL_ARGS, TOOL_CALL_END, TOOL_CALL_RESULT,
 	// TEXT_MESSAGE_START, TEXT_MESSAGE_CONTENT, TEXT_MESSAGE_END, RUN_FINISHED
-	if len(evts) != 8 {
+	if len(evts) != 9 {
 		for i, e := range evts {
 			t.Logf("event[%d]: %v", i, e["type"])
 		}
-		t.Fatalf("got %d events, want 8", len(evts))
+		t.Fatalf("got %d events, want 9", len(evts))
 	}
 
 	assertEventType(t, evts[0], events.EventTypeRunStarted)
 	assertEventType(t, evts[1], events.EventTypeToolCallStart)
 	assertEventType(t, evts[2], events.EventTypeToolCallArgs)
 	assertEventType(t, evts[3], events.EventTypeToolCallEnd)
-	assertEventType(t, evts[4], events.EventTypeTextMessageStart)
-	assertEventType(t, evts[5], events.EventTypeTextMessageContent)
-	assertEventType(t, evts[6], events.EventTypeTextMessageEnd)
-	assertEventType(t, evts[7], events.EventTypeRunFinished)
+	assertEventType(t, evts[4], events.EventTypeToolCallResult)
+	assertEventType(t, evts[5], events.EventTypeTextMessageStart)
+	assertEventType(t, evts[6], events.EventTypeTextMessageContent)
+	assertEventType(t, evts[7], events.EventTypeTextMessageEnd)
+	assertEventType(t, evts[8], events.EventTypeRunFinished)
 
 	// Verify tool call IDs are consistent.
 	if id := evts[1]["toolCallId"]; id != "call-abc" {
@@ -429,6 +430,9 @@ func TestHandler_ToolCallEventsInSSEStream(t *testing.T) {
 	}
 	if id := evts[3]["toolCallId"]; id != "call-abc" {
 		t.Errorf("TOOL_CALL_END toolCallId = %v, want %q", id, "call-abc")
+	}
+	if id := evts[4]["toolCallId"]; id != "call-abc" {
+		t.Errorf("TOOL_CALL_RESULT toolCallId = %v, want %q", id, "call-abc")
 	}
 }
 
@@ -458,28 +462,30 @@ func TestHandler_MultipleToolCallsInOneIteration(t *testing.T) {
 
 	evts := parseSSEEvents(t, rec.Body.Bytes())
 
-	// RUN_STARTED + 2*(START+ARGS+END) + TEXT_MESSAGE_START/CONTENT/END + RUN_FINISHED = 11
-	if len(evts) != 11 {
+	// RUN_STARTED + 2*(START+ARGS+END+RESULT) + TEXT_MESSAGE_START/CONTENT/END + RUN_FINISHED = 13
+	if len(evts) != 13 {
 		for i, e := range evts {
 			t.Logf("event[%d]: %v", i, e["type"])
 		}
-		t.Fatalf("got %d events, want 11", len(evts))
+		t.Fatalf("got %d events, want 13", len(evts))
 	}
 
-	// First tool triplet.
+	// First tool quad.
 	assertEventType(t, evts[1], events.EventTypeToolCallStart)
 	assertEventType(t, evts[2], events.EventTypeToolCallArgs)
 	assertEventType(t, evts[3], events.EventTypeToolCallEnd)
+	assertEventType(t, evts[4], events.EventTypeToolCallResult)
 	if evts[1]["toolCallId"] != "call-1" {
 		t.Errorf("first TOOL_CALL_START toolCallId = %v, want %q", evts[1]["toolCallId"], "call-1")
 	}
 
-	// Second tool triplet.
-	assertEventType(t, evts[4], events.EventTypeToolCallStart)
-	assertEventType(t, evts[5], events.EventTypeToolCallArgs)
-	assertEventType(t, evts[6], events.EventTypeToolCallEnd)
-	if evts[4]["toolCallId"] != "call-2" {
-		t.Errorf("second TOOL_CALL_START toolCallId = %v, want %q", evts[4]["toolCallId"], "call-2")
+	// Second tool quad.
+	assertEventType(t, evts[5], events.EventTypeToolCallStart)
+	assertEventType(t, evts[6], events.EventTypeToolCallArgs)
+	assertEventType(t, evts[7], events.EventTypeToolCallEnd)
+	assertEventType(t, evts[8], events.EventTypeToolCallResult)
+	if evts[5]["toolCallId"] != "call-2" {
+		t.Errorf("second TOOL_CALL_START toolCallId = %v, want %q", evts[5]["toolCallId"], "call-2")
 	}
 }
 
@@ -512,20 +518,20 @@ func TestHandler_MultiIterationToolLoop(t *testing.T) {
 
 	evts := parseSSEEvents(t, rec.Body.Bytes())
 
-	// RUN_STARTED + 2*(START+ARGS+END) + TEXT_MESSAGE_START/CONTENT/END + RUN_FINISHED = 11
-	if len(evts) != 11 {
+	// RUN_STARTED + 2*(START+ARGS+END+RESULT) + TEXT_MESSAGE_START/CONTENT/END + RUN_FINISHED = 13
+	if len(evts) != 13 {
 		for i, e := range evts {
 			t.Logf("event[%d]: %v", i, e["type"])
 		}
-		t.Fatalf("got %d events, want 11", len(evts))
+		t.Fatalf("got %d events, want 13", len(evts))
 	}
 
 	// Verify both iterations produced distinct tool call IDs.
 	if evts[1]["toolCallId"] != "call-iter1" {
 		t.Errorf("iter1 toolCallId = %v, want %q", evts[1]["toolCallId"], "call-iter1")
 	}
-	if evts[4]["toolCallId"] != "call-iter2" {
-		t.Errorf("iter2 toolCallId = %v, want %q", evts[4]["toolCallId"], "call-iter2")
+	if evts[5]["toolCallId"] != "call-iter2" {
+		t.Errorf("iter2 toolCallId = %v, want %q", evts[5]["toolCallId"], "call-iter2")
 	}
 }
 
@@ -760,12 +766,12 @@ func TestHandler_ReasoningWithToolLoop(t *testing.T) {
 	// REASONING_START, REASONING_MESSAGE_START, REASONING_MESSAGE_CONTENT, REASONING_MESSAGE_END, REASONING_END (iter 2)
 	// TEXT_MESSAGE_START, TEXT_MESSAGE_CONTENT, TEXT_MESSAGE_END
 	// RUN_FINISHED
-	// Total: 1 + 5 + 3 + 5 + 3 + 1 = 18
-	if len(evts) != 18 {
+	// Total: 1 + 5 + 4 + 5 + 3 + 1 = 19
+	if len(evts) != 19 {
 		for i, e := range evts {
 			t.Logf("event[%d]: %v", i, e["type"])
 		}
-		t.Fatalf("got %d events, want 18", len(evts))
+		t.Fatalf("got %d events, want 19", len(evts))
 	}
 
 	assertEventType(t, evts[0], events.EventTypeRunStarted)
@@ -779,23 +785,24 @@ func TestHandler_ReasoningWithToolLoop(t *testing.T) {
 	assertEventType(t, evts[6], events.EventTypeToolCallStart)
 	assertEventType(t, evts[7], events.EventTypeToolCallArgs)
 	assertEventType(t, evts[8], events.EventTypeToolCallEnd)
+	assertEventType(t, evts[9], events.EventTypeToolCallResult)
 	// Iteration 2: reasoning
-	assertEventType(t, evts[9], events.EventTypeReasoningStart)
-	assertEventType(t, evts[10], events.EventTypeReasoningMessageStart)
-	assertEventType(t, evts[11], events.EventTypeReasoningMessageContent)
-	assertEventType(t, evts[12], events.EventTypeReasoningMessageEnd)
-	assertEventType(t, evts[13], events.EventTypeReasoningEnd)
+	assertEventType(t, evts[10], events.EventTypeReasoningStart)
+	assertEventType(t, evts[11], events.EventTypeReasoningMessageStart)
+	assertEventType(t, evts[12], events.EventTypeReasoningMessageContent)
+	assertEventType(t, evts[13], events.EventTypeReasoningMessageEnd)
+	assertEventType(t, evts[14], events.EventTypeReasoningEnd)
 	// Iteration 2: text
-	assertEventType(t, evts[14], events.EventTypeTextMessageStart)
-	assertEventType(t, evts[15], events.EventTypeTextMessageContent)
-	assertEventType(t, evts[16], events.EventTypeTextMessageEnd)
-	assertEventType(t, evts[17], events.EventTypeRunFinished)
+	assertEventType(t, evts[15], events.EventTypeTextMessageStart)
+	assertEventType(t, evts[16], events.EventTypeTextMessageContent)
+	assertEventType(t, evts[17], events.EventTypeTextMessageEnd)
+	assertEventType(t, evts[18], events.EventTypeRunFinished)
 
 	// Verify reasoning content per iteration.
 	if delta, _ := evts[3]["delta"].(string); delta != "I should search for this." {
 		t.Errorf("iter1 reasoning delta = %q, want %q", delta, "I should search for this.")
 	}
-	if delta, _ := evts[11]["delta"].(string); delta != "Now I can answer." {
+	if delta, _ := evts[12]["delta"].(string); delta != "Now I can answer." {
 		t.Errorf("iter2 reasoning delta = %q, want %q", delta, "Now I can answer.")
 	}
 }

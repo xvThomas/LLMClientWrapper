@@ -95,15 +95,24 @@ func TestAGUIEmitter_HandleToolCallEnd(t *testing.T) {
 
 	evts := parseSSEData(t, rec.Body.Bytes())
 
-	if len(evts) != 1 {
-		t.Fatalf("got %d events, want 1", len(evts))
+	if len(evts) != 2 {
+		t.Fatalf("got %d events, want 2", len(evts))
 	}
 
 	if got := evts[0]["type"]; got != "TOOL_CALL_END" {
-		t.Errorf("event type = %q, want %q", got, "TOOL_CALL_END")
+		t.Errorf("event[0] type = %q, want %q", got, "TOOL_CALL_END")
 	}
 	if got := evts[0]["toolCallId"]; got != "call-456" {
-		t.Errorf("event toolCallId = %q, want %q", got, "call-456")
+		t.Errorf("event[0] toolCallId = %q, want %q", got, "call-456")
+	}
+	if got := evts[1]["type"]; got != "TOOL_CALL_RESULT" {
+		t.Errorf("event[1] type = %q, want %q", got, "TOOL_CALL_RESULT")
+	}
+	if got := evts[1]["toolCallId"]; got != "call-456" {
+		t.Errorf("event[1] toolCallId = %q, want %q", got, "call-456")
+	}
+	if got := evts[1]["content"]; got != "sunny" {
+		t.Errorf("event[1] content = %q, want %q", got, "sunny")
 	}
 }
 

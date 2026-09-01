@@ -34,7 +34,8 @@
     "unmarshalable",
     "unmarshalling",
     "unmaterialized",
-    "upserting"
+    "upserting",
+    "uuid"
   ],
   "chat.tools.terminal.autoApprove": {
     "go": true

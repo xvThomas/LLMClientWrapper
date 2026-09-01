@@ -27,17 +27,23 @@ const defaultServePort = "8090"
 
 func newServeCmd() *cobra.Command {
 	var portFlag string
+	var systemFileFlag string
 
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start the AG-UI protocol HTTP server",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			port := resolvePort(portFlag)
-			return runServe(cmd.Context(), port)
+			systemFile := systemFileFlag
+			if systemFile == "" {
+				systemFile = defaultSystemPromptPath()
+			}
+			return runServe(cmd.Context(), port, systemFile)
 		},
 	}
 
 	cmd.Flags().StringVar(&portFlag, "port", "", "HTTP server port (default: 8090, env: SERVE_PORT)")
+	cmd.Flags().StringVar(&systemFileFlag, "system-file", "", "Path to a Markdown system prompt file")
 
 	return cmd
 }
@@ -52,7 +58,7 @@ func resolvePort(flagValue string) string {
 	return defaultServePort
 }
 
-func runServe(ctx context.Context, port string) error {
+func runServe(ctx context.Context, port, systemFile string) error {
 	log := logger.Logger
 	if log == nil {
 		log = slog.Default()
@@ -66,7 +72,7 @@ func runServe(ctx context.Context, port string) error {
 	// LLM router for per-request model resolution.
 	llmRouter := router.NewLLMRouter(cfg)
 
-	pp := buildPromptProvider(defaultSystemPromptPath())
+	pp := buildPromptProvider(systemFile)
 
 	// Open shared SQLite store.
 	dbPath := storeDBPath()
