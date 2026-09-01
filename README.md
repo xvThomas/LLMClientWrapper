@@ -219,6 +219,58 @@ make dev
 
 ### Architecture diagram
 
-See [`workshop/talk.drawio`](workshop/talk.drawio) — open with [draw.io](https://draw.io).
+```mermaid
+graph TD
+    subgraph user["User Layer"]
+        CLI["CLI REPL\ntalk-cli"]
+        WEB["Web Client\nAG-UI protocol"]
+    end
+
+    subgraph talk["talk module"]
+        AGUIH["AG-UI Handler\nHTTP · SSE"]
+        DC["domain.Client\nconversation engine"]
+        ROUTER["LLM Router"]
+        MCP_MGR["MCP Manager\ntool registry · executor"]
+        MEM["Memory\nSQLite"]
+        EVENTS["MessageEventHandler\npipeline"]
+    end
+
+    subgraph providers["LLM Providers"]
+        ANT["Anthropic API\nAnthropic SDK"]
+        OAI["OpenAI-compatible API\nOpenAI · Mistral · …"]
+    end
+
+    subgraph mcp["MCP Servers"]
+        OWM["mcp-owm\nOpenWeatherMap"]
+        IGN["mcp-ign-nav\nIGN Géoplateforme"]
+        PLAY["mcp-playground\ntemplate"]
+    end
+
+    subgraph obs["Observability"]
+        LF["Langfuse\nOTLP / HTTP"]
+        CON["Console reporter\ncost · tokens"]
+    end
+
+    subgraph libs["talk-libs (shared)"]
+        LIBS["logger · mcpserver framework\nversion · testutils"]
+    end
+
+    CLI --> DC
+    WEB --> AGUIH --> DC
+    DC --> ROUTER
+    ROUTER --> ANT
+    ROUTER --> OAI
+    DC <--> MEM
+    DC --> MCP_MGR
+    MCP_MGR -->|HTTP / stdio| OWM
+    MCP_MGR -->|HTTP / stdio| IGN
+    MCP_MGR -->|HTTP / stdio| PLAY
+    DC --> EVENTS
+    EVENTS --> LF
+    EVENTS --> CON
+    OWM -.->|built with| LIBS
+    IGN -.->|built with| LIBS
+    PLAY -.->|built with| LIBS
+```
 
 
