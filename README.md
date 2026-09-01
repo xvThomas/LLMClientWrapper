@@ -183,12 +183,10 @@ Each module has its own `Makefile` with module-specific targets.
 
 ---
 
-## Documentation
+## Additional Documentation
 
 | File | Description |
 |------|-------------|
-| [`docs/spec.md`](docs/spec.md) | Original project specifications |
-| [`docs/conversation.md`](docs/conversation.md) | Conversation retrieval design (Langfuse, session management) |
 | [`docs/langfuse.md`](docs/langfuse.md) | Langfuse OTLP observability architecture |
 | [`docs/mcp-server-authentication.md`](docs/mcp-server-authentication.md) | X-API-Key and OAuth 2.0 setup (Auth0, Keycloak) |
 | [`docs/mcp-server-secured.md`](docs/mcp-server-secured.md) | HTTP security hardening (rate limiting, headers, timeouts) |
