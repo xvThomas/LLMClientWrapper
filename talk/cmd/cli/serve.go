@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/ag-ui-protocol/ag-ui/sdks/community/go/pkg/core/types"
-	"github.com/spf13/cobra"
 	"github.com/pixime-net/talk-libs/logger"
 	"github.com/pixime-net/talk/internal/agui"
 	"github.com/pixime-net/talk/internal/config"
@@ -21,6 +20,7 @@ import (
 	"github.com/pixime-net/talk/internal/llm/router"
 	"github.com/pixime-net/talk/internal/mcp"
 	sqlitestore "github.com/pixime-net/talk/internal/memory/sqlite"
+	"github.com/spf13/cobra"
 )
 
 const defaultServePort = "8090"

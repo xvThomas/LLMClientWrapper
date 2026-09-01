@@ -220,10 +220,10 @@ func TestReadLine_NonTTY_UpdatesHistory(t *testing.T) {
 	os.Stdin = r
 	defer func() {
 		os.Stdin = oldStdin
-		r.Close()
+		_ = r.Close()
 	}()
 	go func() {
-		defer w.Close()
+		defer func() { _ = w.Close() }()
 		_, _ = w.WriteString("hello world\n")
 	}()
 
@@ -252,10 +252,10 @@ func TestReadLineRaw(t *testing.T) {
 	os.Stdin = r
 	defer func() {
 		os.Stdin = oldStdin
-		r.Close()
+		_ = r.Close()
 	}()
 	go func() {
-		defer w.Close()
+		defer func() { _ = w.Close() }()
 		_, _ = w.WriteString("secret-value\n")
 	}()
 
@@ -274,12 +274,12 @@ func TestReadLineFallback_EOF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("os.Pipe: %v", err)
 	}
-	w.Close() // immediate EOF, no content
+	_ = w.Close() // immediate EOF, no content
 	oldStdin := os.Stdin
 	os.Stdin = r
 	defer func() {
 		os.Stdin = oldStdin
-		r.Close()
+		_ = r.Close()
 	}()
 
 	_, err = readLineFallback("> ")
@@ -294,12 +294,12 @@ func TestReadLineFallback_EOFWithContent(t *testing.T) {
 		t.Fatalf("os.Pipe: %v", err)
 	}
 	_, _ = w.WriteString("partial") // no newline — triggers EOF path with content
-	w.Close()
+	_ = w.Close()
 	oldStdin := os.Stdin
 	os.Stdin = r
 	defer func() {
 		os.Stdin = oldStdin
-		r.Close()
+		_ = r.Close()
 	}()
 
 	line, err := readLineFallback("> ")
