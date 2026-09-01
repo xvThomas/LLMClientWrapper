@@ -235,11 +235,11 @@ The frontend renders reasoning content inside a collapsible `ReasoningBlock` com
 
 ### Tool call events
 
-When the model invokes an MCP tool, the backend emits three events — before and after tool execution. This lets the frontend show live tool activity (name, arguments, result) as it happens.
+When the model invokes an MCP tool, the backend emits four events — before and after tool execution. This lets the frontend show live tool activity (name, arguments, result) as it happens.
 
 #### `TOOL_CALL_START`
 
-Announces that a tool is about to be called. The `toolCallId` links the three events together.
+Announces that a tool is about to be called. The `toolCallId` links the four tool-call events together.
 
 ```json
 {
@@ -263,7 +263,7 @@ Carries the serialised arguments for the tool call. They are always JSON-encoded
 
 #### `TOOL_CALL_END`
 
-Signals that the tool has returned. The tool result is not carried in this event — it flows back through the message history on the **next** request (as a `role: "tool"` message), not in the SSE stream.
+Signals that the tool invocation has finished.
 
 ```json
 {
@@ -271,6 +271,20 @@ Signals that the tool has returned. The tool result is not carried in this event
   "toolCallId": "call-uuid"
 }
 ```
+
+#### `TOOL_CALL_RESULT`
+
+Carries the tool output for the completed call in the SSE stream.
+
+```json
+{
+  "type": "TOOL_CALL_RESULT",
+  "toolCallId": "call-uuid",
+  "content": "{\"temp\":18,\"condition\":\"sunny\"}"
+}
+```
+
+`TOOL_CALL_RESULT.content` is treated as opaque text by the protocol. In this codebase, tools generally return JSON serialized as a string, but plain text results are also valid.
 
 ---
 
@@ -306,7 +320,7 @@ sequenceDiagram
 
 ## Tool call flow
 
-The model may call several tools in sequence within a single run. Each tool invocation is bracketed by `TOOL_CALL_START` / `TOOL_CALL_END`. After all tool calls are complete the model produces a final text answer.
+The model may call several tools in sequence within a single run. Each tool invocation emits `TOOL_CALL_START` / `TOOL_CALL_ARGS` / `TOOL_CALL_END` / `TOOL_CALL_RESULT`. After all tool calls are complete the model produces a final text answer.
 
 ```mermaid
 sequenceDiagram
@@ -321,13 +335,12 @@ sequenceDiagram
     S->>T: call get_current_weather
     T-->>S: {"temp":18,"condition":"sunny"}
     S-->>UI: TOOL_CALL_END
+    S-->>UI: TOOL_CALL_RESULT ({"temp":18,"condition":"sunny"})
     S-->>UI: TEXT_MESSAGE_START
     S-->>UI: TEXT_MESSAGE_CONTENT ("It is 18°C...")
     S-->>UI: TEXT_MESSAGE_END
     S-->>UI: RUN_FINISHED
 ```
-
-> The tool result is not streamed back via SSE. On the **next** turn, the frontend includes it in `messages` as `{ "role": "tool", "toolCallId": "call-uuid", "content": "..." }`.
 
 ---
 
@@ -424,7 +437,7 @@ The table below maps each backend action in `talk/internal/agui/emitter.go` to t
 | Assistant message with thinking content                   | `REASONING_START` → `REASONING_MESSAGE_START` → `REASONING_MESSAGE_CONTENT` → `REASONING_MESSAGE_END` → `REASONING_END` |
 | Final assistant text (no tool calls, non-empty content)   | `TEXT_MESSAGE_START` → `TEXT_MESSAGE_CONTENT` → `TEXT_MESSAGE_END`                               |
 | Tool call — before execution                              | `TOOL_CALL_START` → `TOOL_CALL_ARGS`                                                             |
-| Tool call — after execution                               | `TOOL_CALL_END`                                                                                  |
+| Tool call — after execution                               | `TOOL_CALL_END` → `TOOL_CALL_RESULT`                                                             |
 | Run completed normally                                    | `RUN_FINISHED`                                                                                   |
 | Max tool iterations reached                               | `RUN_FINISHED` (outcome=interrupt, reason=`talk:max_iterations`)                                 |
 | Cancelled resume with no new user message                 | `RUN_STARTED` → `RUN_FINISHED` (empty run)                                                       |
