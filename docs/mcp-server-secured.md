@@ -114,40 +114,25 @@ HTTP_IDLE_TIMEOUT=60
 
 ## Architecture
 
-```
-Incoming request
-    │
-    ▼
-┌─────────────────────┐
-│  Rate Limit (per-IP)│ → 429 Too Many Requests
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Security Headers   │ → adds protective headers
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Path Filter        │ → 404 for unknown paths
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Request Logger     │ → logs method, path, IP, UA
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Auth Middleware    │ → 401 Unauthorized
-│  (API Key / OAuth)  │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  MCP Handler        │ → business logic
-│  (/sse or /mcp)     │
-└─────────────────────┘
+```mermaid
+flowchart TD
+    REQ([Incoming request])
+    RL[Rate Limit per-IP]
+    SH[Security Headers]
+    PF[Path Filter]
+    LOG[Request Logger]
+    AUTH["Auth Middleware<br/>(API Key / OAuth)"]
+    MCP["MCP Handler<br/>(/sse or /mcp)"]
+
+    REQ --> RL
+    RL -->|exceeded| ERR429([429 Too Many Requests])
+    RL -->|pass| SH
+    SH --> PF
+    PF -->|unknown path| ERR404([404 Not Found])
+    PF -->|pass| LOG
+    LOG --> AUTH
+    AUTH -->|invalid| ERR401([401 Unauthorized])
+    AUTH -->|pass| MCP
 ```
 
 ## Deployment Recommendations

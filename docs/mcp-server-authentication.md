@@ -52,13 +52,14 @@ The client sends a shared secret in the `X-API-Key` header with every request.
 
 ### Flow
 
-```
-Client                          MCP Server
-  │                                  │
-  │── POST /mcp ────────────────────>│
-  │   Header: X-API-Key: <secret>    │
-  │                                  │── Verify X-API-Key
-  │<──────────── 200 OK ─────────────│
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as MCP Server
+
+    C->>S: POST /mcp (X-API-Key: secret)
+    Note right of S: Verify X-API-Key
+    S-->>C: 200 OK
 ```
 
 ---
@@ -82,19 +83,19 @@ The OAuth client talks directly to the Authorization Server. The MCP server only
 
 This mode works when the client correctly sends the `audience` parameter in the authorization request (which Auth0 requires to issue a JWT).
 
-```
-Client                    Authorization Server          MCP Server
-  │                              │                          │
-  │── GET /authorize ───────────>│                          │
-  │   (with audience=owm-mcp)    │                          │
-  │<──── redirect + code ─────-──│                          │
-  │── POST /token ──────────────>│                          │
-  │<──── access_token (JWT) ─────│                          │
-  │                              │                          │
-  │── POST /mcp ───────────────────────────────────────────>│
-  │   Header: Authorization: Bearer <JWT>                   │
-  │                              │                          │── Validate JWT (JWKS)
-  │<──────────────────────────── 200 OK ────────────────────│
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant AS as Authorization Server
+    participant S as MCP Server
+
+    C->>AS: GET /authorize (audience=owm-mcp)
+    AS-->>C: 302 redirect + code
+    C->>AS: POST /token
+    AS-->>C: access_token (JWT)
+    C->>S: POST /mcp (Authorization: Bearer JWT)
+    Note right of S: Validate JWT (JWKS)
+    S-->>C: 200 OK
 ```
 
 ### 2.3. Proxy Mode (for Claude.ai / Auth0)
@@ -109,35 +110,28 @@ The AS proxy solves this problem by exposing three local endpoints:
 | `/authorize`                              | Injects `audience` and `offline_access`, redirects to Auth0 |
 | `/token`                                  | Forwards to Auth0, injects `client_secret` if configured    |
 
-```txt
-Client              MCP Server (proxy)           Auth0
-  │                        │                        │
-  │── POST /mcp ──────────>│                        │
-  │<── 401 + WWW-Auth ─────│                        │
-  │                        │                        │
-  │── GET /.well-known/ ──>│                        │
-  │   oauth-protected-     │                        │
-  │   resource             │                        │
-  │<── {authorization_ ────│                        │
-  │     servers: [self]}   │                        │
-  │                        │                        │
-  │── GET /.well-known/ ──>│                        │
-  │   oauth-authorization- │                        │
-  │   server               │                        │
-  │<── {endpoints proxy} ──│                        │
-  │                        │                        │
-  │── GET /authorize ─────>│                        │
-  │                        │── + audience=owm-mcp ─>│
-  │                        │── + offline_access ───>│
-  │<── redirect Auth0 ─────│<── redirect + code ─-──│
-  │                        │                        │
-  │── POST /token ────────>│                        │
-  │                        │── + client_secret ────>│
-  │<── access_token ───────│<── JWT + refresh ───-──│
-  │                        │                        │
-  │── POST /mcp ──────────>│                        │
-  │   Bearer <JWT>         │── Validate JWT (JWKS)  │
-  │<── 200 OK ─────────────│                        │
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant P as MCP Server (proxy)
+    participant AS as Auth0
+
+    C->>P: POST /mcp
+    P-->>C: 401 Unauthorized + WWW-Authenticate
+    C->>P: GET /.well-known/oauth-protected-resource
+    P-->>C: { authorization_servers: [self] }
+    C->>P: GET /.well-known/oauth-authorization-server
+    P-->>C: { proxy endpoints }
+    C->>P: GET /authorize
+    P->>AS: GET /authorize + audience=owm-mcp + offline_access
+    AS-->>C: 302 redirect + code
+    C->>P: POST /token (code)
+    P->>AS: POST /token + client_secret
+    AS-->>P: JWT + refresh_token
+    P-->>C: access_token (JWT)
+    C->>P: POST /mcp (Authorization: Bearer JWT)
+    Note right of P: Validate JWT (JWKS)
+    P-->>C: 200 OK
 ```
 
 ---
