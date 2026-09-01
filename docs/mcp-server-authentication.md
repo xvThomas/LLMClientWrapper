@@ -369,7 +369,7 @@ Both mechanisms are enabled simultaneously. The server uses a **fallback strateg
 2. If only `Authorization: Bearer ...` is present (no API Key) → OAuth validation
 3. If **both** headers are present → OAuth is tried first; if it fails with 401, the server falls back to API Key validation
 
-This fallback behavior accommodates clients (e.g. EDEN) that send both headers simultaneously — even if the Bearer token is invalid, the request can still succeed via the API Key.
+This fallback behavior accommodates clients that send both headers simultaneously — even if the Bearer token is invalid, the request can still succeed via the API Key.
 
 ```env
 X_API_KEY=mysecretkey
