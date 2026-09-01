@@ -187,6 +187,8 @@ Each module has its own `Makefile` with module-specific targets.
 
 | File | Description |
 |------|-------------|
+| [`docs/ag-ui-protocol.md`](docs/ag-ui-protocol.md) | AG-UI protocol: events, request format, flows (text, tool calls, reasoning, interrupts) |
+| [`docs/mcp-protocol.md`](docs/mcp-protocol.md) | MCP protocol: JSON-RPC lifecycle, server framework, client manager, tool execution |
 | [`docs/langfuse.md`](docs/langfuse.md) | Langfuse OTLP observability architecture |
 | [`docs/mcp-server-authentication.md`](docs/mcp-server-authentication.md) | X-API-Key and OAuth 2.0 setup (Auth0, Keycloak) |
 | [`docs/mcp-server-secured.md`](docs/mcp-server-secured.md) | HTTP security hardening (rate limiting, headers, timeouts) |
