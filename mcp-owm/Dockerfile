@@ -20,7 +20,9 @@ RUN VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev") &&
 
 FROM alpine:3.21
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates && \
+    addgroup -S appuser && \
+    adduser -S -G appuser -H -D appuser
 
 COPY --from=builder /bin/mcp-owm /usr/local/bin/mcp-owm
 
