@@ -300,7 +300,7 @@ tmp_dir = "tmp"
 [build]
 cmd = "go build -o ./tmp/mcp-<server-name>.exe ./cmd"
 bin = "./tmp/mcp-<server-name>.exe"
-args_bin = ["--transport", "http", "--addr", "localhost:8080"]
+args_bin = ["--transport", "http"]
 include_ext = ["go", "toml", "env"]
 include_dir = ["cmd", "internal"]
 exclude_dir = ["tmp", "bin"]

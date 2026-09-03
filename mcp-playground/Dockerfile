@@ -26,7 +26,9 @@ COPY --from=builder /bin/mcp-playground /usr/local/bin/mcp-playground
 
 USER appuser
 
+ENV HTTP_HOST=0.0.0.0 \
+    HTTP_PORT=8080
 EXPOSE 8080
 
-ENTRYPOINT ["mcp-playground", "--transport", "http", "--addr", "0.0.0.0:8080"]
+ENTRYPOINT ["mcp-playground", "--transport", "http"]
 

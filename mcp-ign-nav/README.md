@@ -78,6 +78,8 @@ Optional environment variables (for MCP authentication, not for the IGN API):
 | `MCP_OAUTH_AUDIENCE`         | Expected JWT audience                |
 | `MCP_OAUTH_SCOPES`           | Comma-separated OAuth scopes         |
 | `MCP_BASE_URL`               | Public base URL of this server       |
+| `HTTP_HOST`                  | Interface the HTTP transport binds to (default: `localhost`; use `0.0.0.0` for containers) |
+| `HTTP_PORT`                  | Port the HTTP transport listens on (default: `8080`) |
 
 
 ## Build & Run
@@ -86,15 +88,16 @@ Optional environment variables (for MCP authentication, not for the IGN API):
 # Build
 make build
 
-# Run (HTTP transport)
+# Run (HTTP transport, listens on $HTTP_HOST:$HTTP_PORT — default localhost:8080)
 make run
 
 # Run (stdio transport)
 ./bin/mcp-ign-nav --transport stdio
 
-# Docker
+# Docker (the image sets HTTP_HOST=0.0.0.0; override HTTP_PORT to change the port)
 make dockerize
 docker run -p 8080:8080 mcp-ign-nav
+docker run -p 9000:9000 -e HTTP_PORT=9000 mcp-ign-nav
 ```
 
 ## Development

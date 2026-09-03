@@ -28,6 +28,8 @@ COPY --from=builder /bin/mcp-ign-nav /usr/local/bin/mcp-ign-nav
 
 USER appuser
 
+ENV HTTP_HOST=0.0.0.0 \
+    HTTP_PORT=8080
 EXPOSE 8080
 
-ENTRYPOINT ["mcp-ign-nav", "--transport", "http", "--addr", "0.0.0.0:8080"]
+ENTRYPOINT ["mcp-ign-nav", "--transport", "http"]

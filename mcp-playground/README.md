@@ -8,11 +8,20 @@ A minimal MCP server used as a reference implementation for the `talk-libs/mcpse
 |-------|--------------------------------|
 | `sum` | Compute the sum of two integers |
 
+## Environment Variables
+
+| Variable    | Required | Default     | Description                                                                       |
+|-------------|----------|-------------|-----------------------------------------------------------------------------------|
+| `HTTP_HOST` | no       | `localhost` | Interface the HTTP transport binds to (`0.0.0.0` to accept external connections)  |
+| `HTTP_PORT` | no       | `8080`      | Port the HTTP transport listens on                                                |
+
 ## Run
 
 ```bash
 make dev
 ```
+
+The HTTP transport listens on `$HTTP_HOST:$HTTP_PORT` (default `localhost:8080`).
 
 ## Authentication
 

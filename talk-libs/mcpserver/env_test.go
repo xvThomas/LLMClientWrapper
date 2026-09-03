@@ -13,7 +13,7 @@ func TestLoadBaseEnv_Defaults(t *testing.T) {
 		"OAUTH_AUDIENCE", "OAUTH_SCOPES", "OAUTH_CLIENT_SECRET",
 		"HTTP_RATE_LIMIT", "HTTP_RATE_BURST",
 		"HTTP_READ_TIMEOUT", "HTTP_WRITE_TIMEOUT", "HTTP_IDLE_TIMEOUT",
-		"HTTP_TRUSTED_PROXIES",
+		"HTTP_TRUSTED_PROXIES", "HTTP_PORT", "HTTP_HOST",
 	}
 	for _, k := range keys {
 		t.Setenv(k, "")
@@ -26,6 +26,12 @@ func TestLoadBaseEnv_Defaults(t *testing.T) {
 	}
 	if env.HTTPRateLimit != 50 {
 		t.Errorf("expected HTTPRateLimit 50, got %d", env.HTTPRateLimit)
+	}
+	if env.HTTPPort != DefaultHTTPPort {
+		t.Errorf("expected HTTPPort %d, got %d", DefaultHTTPPort, env.HTTPPort)
+	}
+	if env.HTTPHost != DefaultHTTPHost {
+		t.Errorf("expected HTTPHost %q, got %q", DefaultHTTPHost, env.HTTPHost)
 	}
 	if env.HTTPRateBurst != 50 {
 		t.Errorf("expected HTTPRateBurst 50, got %d", env.HTTPRateBurst)
@@ -51,6 +57,8 @@ func TestLoadBaseEnv_AllSet(t *testing.T) {
 	t.Setenv("OAUTH_AUDIENCE", "my-api")
 	t.Setenv("OAUTH_SCOPES", "read,write")
 	t.Setenv("OAUTH_CLIENT_SECRET", "s3cret")
+	t.Setenv("HTTP_PORT", "9100")
+	t.Setenv("HTTP_HOST", "0.0.0.0")
 	t.Setenv("HTTP_RATE_LIMIT", "100")
 	t.Setenv("HTTP_RATE_BURST", "200")
 	t.Setenv("HTTP_READ_TIMEOUT", "5")
@@ -78,6 +86,12 @@ func TestLoadBaseEnv_AllSet(t *testing.T) {
 	if env.HTTPRateLimit != 100 {
 		t.Errorf("expected HTTPRateLimit 100, got %d", env.HTTPRateLimit)
 	}
+	if env.HTTPPort != 9100 {
+		t.Errorf("expected HTTPPort 9100, got %d", env.HTTPPort)
+	}
+	if env.HTTPHost != "0.0.0.0" {
+		t.Errorf("expected HTTPHost %q, got %q", "0.0.0.0", env.HTTPHost)
+	}
 	if env.HTTPRateBurst != 200 {
 		t.Errorf("expected HTTPRateBurst 200, got %d", env.HTTPRateBurst)
 	}
@@ -100,6 +114,24 @@ func TestEnvInt_Default(t *testing.T) {
 	got := envInt("TEST_ENV_INT", 42)
 	if got != 42 {
 		t.Errorf("expected default 42, got %d", got)
+	}
+}
+
+func TestHTTPAddr(t *testing.T) {
+	t.Setenv("HTTP_HOST", "")
+	t.Setenv("HTTP_PORT", "")
+	if got := httpAddr(); got != "localhost:8080" {
+		t.Errorf("expected %q, got %q", "localhost:8080", got)
+	}
+
+	t.Setenv("HTTP_PORT", "9100")
+	if got := httpAddr(); got != "localhost:9100" {
+		t.Errorf("expected %q, got %q", "localhost:9100", got)
+	}
+
+	t.Setenv("HTTP_HOST", "0.0.0.0")
+	if got := httpAddr(); got != "0.0.0.0:9100" {
+		t.Errorf("expected %q, got %q", "0.0.0.0:9100", got)
 	}
 }
 

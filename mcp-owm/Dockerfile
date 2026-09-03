@@ -28,6 +28,8 @@ COPY --from=builder /bin/mcp-owm /usr/local/bin/mcp-owm
 
 USER appuser
 
+ENV HTTP_HOST=0.0.0.0 \
+    HTTP_PORT=8080
 EXPOSE 8080
 
-ENTRYPOINT ["mcp-owm", "--transport", "http", "--addr", "0.0.0.0:8080"]
+ENTRYPOINT ["mcp-owm", "--transport", "http"]

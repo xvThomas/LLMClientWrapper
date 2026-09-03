@@ -27,8 +27,8 @@ build: ## Build the binary
 	go build $(LDFLAGS) -o $(BINARY) $(CMD)
 	@$(ECHO) "$(COLOR_GREEN)$(CHECK) Build successful: $(BINARY)$(COLOR_RESET)"
 
-run: ## Run the server (TRANSPORT=http, ADDR=localhost:8080)
-	go run $(LDFLAGS) $(CMD) --transport $(or $(TRANSPORT),http) --addr $(or $(ADDR),localhost:8080)
+run: ## Run the server (TRANSPORT=http; address from HTTP_HOST/HTTP_PORT)
+	go run $(LDFLAGS) $(CMD) --transport $(or $(TRANSPORT),http)
 
 dev: ## Run the server with hot reload (air) in http mode
 	air

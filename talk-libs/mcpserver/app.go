@@ -139,14 +139,15 @@ func (a *App) Run() {
 	log := logger.GetLogger()
 
 	transport := flag.String("transport", "stdio", "transport to use: stdio | http")
-	addr := flag.String("addr", "localhost:8080", "address to listen on (HTTP transport)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\nOptions:\n", os.Args[0])
 		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nThe HTTP transport listens on $HTTP_HOST:$HTTP_PORT (default %s:%d).\n",
+			DefaultHTTPHost, DefaultHTTPPort)
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  %s --transport stdio\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s --transport http --addr localhost:8080\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --transport http\n", os.Args[0])
 	}
 	flag.Parse()
 
@@ -170,7 +171,7 @@ func (a *App) Run() {
 	case "stdio":
 		a.runStdio()
 	case "http":
-		a.runHTTP(*addr)
+		a.runHTTP(httpAddr())
 	default:
 		log.Error("unknown transport", "transport", *transport)
 		flag.Usage()

@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 [build]
 cmd = "go build -o ./tmp/mcp-owm.exe ./cmd"
 bin = "./tmp/mcp-owm.exe"
-args_bin = ["--transport", "http", "--addr", "localhost:8080"]
+args_bin = ["--transport", "http"]
 include_ext = ["go", "toml", "env"]
 include_dir = ["cmd", "internal"]
 exclude_dir = ["tmp", "bin"]

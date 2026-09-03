@@ -289,12 +289,13 @@ app := mcpserver.NewApp("owm-mcp", version.Version,
     mcpserver.WithPrompts(mcpserver.RegisterPrompt(prompts.CurrentWeather)),
     mcpserver.WithBaseEnvHTTPSecurity(env.BaseEnv),
 )
-app.Run() // parses --transport and --addr flags, then starts
+app.Run() // parses the --transport flag, then starts
 ```
 
 `app.Run()` reads `--transport` from the command line:
 - `stdio`: reads JSON-RPC from stdin, writes to stdout (used by Claude Desktop)
-- `http`: starts an HTTP server on `--addr` (default `localhost:8080`) with `/sse` and `/mcp` endpoints
+- `http`: starts an HTTP server on `$HTTP_HOST:$HTTP_PORT` (default `localhost:8080`) with
+  `/sse` and `/mcp` endpoints
 
 ### HTTP endpoints
 

@@ -19,6 +19,8 @@ A free OpenWeatherMap API key is required.
 | `OPENWEATHERMAP_API_KEY` | **yes** | — | Your OpenWeatherMap API key |
 | `OPENWEATHERMAP_FREE_PLAN` | no | `true` | Set to `false` to enable pro-only tools (hourly/daily forecasts) |
 | `OPENWEATHERMAP_RATE_LIMIT_PER_MINUTE` | no | `60` | Max API calls per minute |
+| `HTTP_HOST` | no | `localhost` | Interface the HTTP transport binds to (`0.0.0.0` to accept external connections) |
+| `HTTP_PORT` | no | `8080` | Port the HTTP transport listens on |
 
 Example `.env`:
 
@@ -27,6 +29,9 @@ OPENWEATHERMAP_API_KEY=your_key_here
 OPENWEATHERMAP_FREE_PLAN=true
 # Rate limit (default matches the free plan)
 # OPENWEATHERMAP_RATE_LIMIT_PER_MINUTE=60
+# HTTP listen address
+# HTTP_HOST=localhost
+# HTTP_PORT=8080
 ```
 
 ## Tools
@@ -63,6 +68,8 @@ OPENWEATHERMAP_FREE_PLAN=true
 ```bash
 make dev
 ```
+
+The HTTP transport listens on `$HTTP_HOST:$HTTP_PORT` (default `localhost:8080`).
 
 ## Authentication
 
