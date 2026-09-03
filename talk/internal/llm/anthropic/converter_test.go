@@ -197,6 +197,6 @@ func (f *fakeTool) InputSchema() (map[string]any, error) { return f.inputSchema,
 func (f *fakeTool) OutputSchema() (map[string]any, error) {
 	return map[string]any{"type": "object"}, nil
 }
-func (f *fakeTool) Execute(_ context.Context, _ map[string]any) (map[string]any, error) {
-	return nil, nil
+func (f *fakeTool) Execute(_ context.Context, _ map[string]any) (domain.ToolOutput, error) {
+	return domain.ToolOutput{}, nil
 }

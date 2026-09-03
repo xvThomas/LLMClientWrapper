@@ -59,7 +59,7 @@ type RouteToolOutput struct {
 	Distance     float64          `json:"distance" description:"Total route distance in meters"`
 	Duration     float64          `json:"duration" description:"Total route duration in seconds"`
 	Bbox         [4]float64       `json:"bbox" description:"Bounding box [minLon, minLat, maxLon, maxLat]"`
-	Geometry     *GeoJSONGeometry `json:"geometry" description:"Route geometry as a GeoJSON LineString"`
+	Geometry     *GeoJSONGeometry `json:"geometry,omitempty" description:"Route geometry as a GeoJSON LineString"`
 	Portions     []RoutePortion   `json:"portions" description:"Route portions between waypoints"`
 }
 
@@ -69,6 +69,14 @@ type RouteTool struct {
 }
 
 var _ mcpserver.MCPTool[RouteToolInput, RouteToolOutput] = (*RouteTool)(nil)
+var _ mcpserver.ModelViewer[RouteToolOutput] = (*RouteTool)(nil)
+
+// ModelView drops the route geometry, which weighs over 90% of the payload and
+// is only consumed by map clients.
+func (t *RouteTool) ModelView(out RouteToolOutput) RouteToolOutput {
+	out.Geometry = nil
+	return out
+}
 
 // NewRouteTool creates a RouteTool using the IGN Navigation API.
 func NewRouteTool(limiter *rate.Limiter) *RouteTool {

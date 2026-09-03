@@ -24,11 +24,12 @@ func (m *mockTool) InputSchema() (map[string]any, error) {
 func (m *mockTool) OutputSchema() (map[string]any, error) {
 	return map[string]any{"type": "object"}, nil
 }
-func (m *mockTool) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
+func (m *mockTool) Execute(ctx context.Context, input map[string]any) (ToolOutput, error) {
 	if m.executeFunc != nil {
-		return m.executeFunc(ctx, input)
+		out, err := m.executeFunc(ctx, input)
+		return ToolOutput{Model: out}, err
 	}
-	return map[string]any{"result": "success"}, nil
+	return ToolOutput{Model: map[string]any{"result": "success"}}, nil
 }
 
 func TestToolExecutor_ExecuteTool(t *testing.T) {
@@ -326,9 +327,9 @@ func (m *unmarshalableTool) OutputSchema() (map[string]any, error) {
 	return map[string]any{"type": "object"}, nil
 }
 
-func (m *unmarshalableTool) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
+func (m *unmarshalableTool) Execute(ctx context.Context, input map[string]any) (ToolOutput, error) {
 	// Return a value with a channel which cannot be JSON marshaled
-	return map[string]any{"channel": make(chan int)}, nil
+	return ToolOutput{Model: map[string]any{"channel": make(chan int)}}, nil
 }
 
 func TestToolExecutor_JSONMarshalError(t *testing.T) {

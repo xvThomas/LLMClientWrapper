@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS messages (
 	tool_name  TEXT NOT NULL DEFAULT '',
 	tool_input TEXT NOT NULL DEFAULT '',
 	tool_output TEXT NOT NULL DEFAULT '',
+	tool_output_client TEXT NOT NULL DEFAULT '',
 	tool_call_id TEXT NOT NULL DEFAULT '',
 	turn_id    TEXT NOT NULL DEFAULT '',
 	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -190,18 +191,18 @@ func (r *MessageRepository) HandleMessageEvent(ctx context.Context, event domain
 
 	now := time.Now().UTC().Format(timeFormat)
 	content := msg.Content
-	toolName, toolInput, toolOutput, toolCallID := "", "", "", ""
+	var tool toolRoleFields
 
 	if msg.Role == domain.RoleAssistant {
-		toolInput = buildAssistantToolInput(msg.ToolCalls)
+		tool.input = buildAssistantToolInput(msg.ToolCalls)
 	}
 	if msg.Role == domain.RoleTool {
-		toolName, toolInput, toolOutput, toolCallID = buildToolRoleFields(msg)
+		tool = buildToolRoleFields(msg)
 	}
 
 	if _, err := r.conn.ExecContext(ctx,
-		"INSERT INTO messages (session_id, role, content, tool_name, tool_input, tool_output, tool_call_id, turn_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		scope.SessionID(), string(msg.Role), content, toolName, toolInput, toolOutput, toolCallID, msg.TurnID, now,
+		"INSERT INTO messages (session_id, role, content, tool_name, tool_input, tool_output, tool_output_client, tool_call_id, turn_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		scope.SessionID(), string(msg.Role), content, tool.name, tool.input, tool.output, tool.clientOutput, tool.callID, msg.TurnID, now,
 	); err != nil {
 		return storeErr("inserting message", err)
 	}
@@ -304,23 +305,34 @@ func buildAssistantToolInput(toolCalls []domain.ToolCall) string {
 	return string(rawCalls)
 }
 
+// toolRoleFields holds the storage columns of a tool-role message.
+type toolRoleFields struct {
+	name         string
+	input        string
+	output       string
+	clientOutput string
+	callID       string
+}
+
 // buildToolRoleFields extracts the storage fields for a tool-role message.
-func buildToolRoleFields(msg domain.Message) (toolName, toolInput, toolOutput, toolCallID string) {
+func buildToolRoleFields(msg domain.Message) toolRoleFields {
+	var f toolRoleFields
 	if len(msg.ToolCalls) > 0 {
-		toolName = msg.ToolCalls[0].Name
-		toolCallID = msg.ToolCalls[0].ID
+		f.name = msg.ToolCalls[0].Name
+		f.callID = msg.ToolCalls[0].ID
 		rawInput, err := json.Marshal(msg.ToolCalls[0].Input)
 		if err == nil {
-			toolInput = string(rawInput)
+			f.input = string(rawInput)
 		}
 	}
 	if len(msg.ToolResults) > 0 {
-		toolOutput = msg.ToolResults[0].Content
-		if toolCallID == "" {
-			toolCallID = msg.ToolResults[0].ToolCallID
+		f.output = msg.ToolResults[0].Content
+		f.clientOutput = msg.ToolResults[0].ClientContent
+		if f.callID == "" {
+			f.callID = msg.ToolResults[0].ToolCallID
 		}
 	}
-	return
+	return f
 }
 
 // AllMessages returns all messages for the given session.
@@ -329,7 +341,7 @@ func (r *MessageRepository) AllMessages(ctx context.Context, sessionID string) (
 	defer r.mu.RUnlock()
 
 	rows, err := r.conn.QueryContext(ctx,
-		"SELECT role, content, tool_name, tool_input, tool_output, tool_call_id, turn_id FROM messages WHERE session_id = ? ORDER BY id",
+		"SELECT role, content, tool_name, tool_input, tool_output, tool_output_client, tool_call_id, turn_id FROM messages WHERE session_id = ? ORDER BY id",
 		sessionID,
 	)
 	if err != nil {
@@ -353,8 +365,9 @@ func (r *MessageRepository) AllMessages(ctx context.Context, sessionID string) (
 
 // scanMessageRow scans one row from the messages query and reconstructs the domain.Message.
 func scanMessageRow(rows *sql.Rows) (domain.Message, error) {
-	var role, content, toolName, toolInput, toolOutput, toolCallID, turnID string
-	if err := rows.Scan(&role, &content, &toolName, &toolInput, &toolOutput, &toolCallID, &turnID); err != nil {
+	var role, content, turnID string
+	var tool toolRoleFields
+	if err := rows.Scan(&role, &content, &tool.name, &tool.input, &tool.output, &tool.clientOutput, &tool.callID, &turnID); err != nil {
 		return domain.Message{}, storeErr("scanning message", err)
 	}
 	msg := domain.Message{
@@ -364,9 +377,9 @@ func scanMessageRow(rows *sql.Rows) (domain.Message, error) {
 	}
 	switch msg.Role {
 	case domain.RoleAssistant:
-		msg = buildAssistantMessage(msg, toolInput)
+		msg = buildAssistantMessage(msg, tool.input)
 	case domain.RoleTool:
-		msg = buildToolMessage(msg, toolName, toolInput, toolOutput, toolCallID)
+		msg = buildToolMessage(msg, tool)
 	}
 	return msg, nil
 }
@@ -384,22 +397,23 @@ func buildAssistantMessage(msg domain.Message, toolInput string) domain.Message 
 }
 
 // buildToolMessage attaches tool call and tool result to a tool-role message.
-func buildToolMessage(msg domain.Message, toolName, toolInput, toolOutput, toolCallID string) domain.Message {
-	if toolName == "" && toolInput == "" && toolOutput == "" && toolCallID == "" {
+func buildToolMessage(msg domain.Message, tool toolRoleFields) domain.Message {
+	if tool.name == "" && tool.input == "" && tool.output == "" && tool.callID == "" {
 		return msg
 	}
 	var input map[string]any
-	if toolInput != "" {
-		_ = json.Unmarshal([]byte(toolInput), &input)
+	if tool.input != "" {
+		_ = json.Unmarshal([]byte(tool.input), &input)
 	}
 	msg.ToolCalls = append(msg.ToolCalls, domain.ToolCall{
-		ID:    toolCallID,
-		Name:  toolName,
+		ID:    tool.callID,
+		Name:  tool.name,
 		Input: input,
 	})
 	msg.ToolResults = append(msg.ToolResults, domain.ToolResult{
-		ToolCallID: toolCallID,
-		Content:    toolOutput,
+		ToolCallID:    tool.callID,
+		Content:       tool.output,
+		ClientContent: tool.clientOutput,
 	})
 	return msg
 }

@@ -19,7 +19,19 @@ type ToolCall struct {
 // ToolResult holds the output of an executed tool call.
 type ToolResult struct {
 	ToolCallID string
-	Content    string
+	// Content is the payload sent to the model.
+	Content string
+	// ClientContent is the full payload for non-model consumers such as the map UI.
+	// Empty when it would be identical to Content.
+	ClientContent string
+}
+
+// ClientPayload returns the content intended for non-model consumers.
+func (r ToolResult) ClientPayload() string {
+	if r.ClientContent != "" {
+		return r.ClientContent
+	}
+	return r.Content
 }
 
 // Message is a single entry in a conversation.

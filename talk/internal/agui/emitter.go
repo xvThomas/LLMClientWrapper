@@ -59,7 +59,7 @@ func (e *AGUIEmitter) HandleToolCallStart(ctx context.Context, event domain.Tool
 // HandleToolCallEnd emits TOOL_CALL_END then TOOL_CALL_RESULT with the tool output.
 func (e *AGUIEmitter) HandleToolCallEnd(ctx context.Context, event domain.ToolCallEndEvent) error {
 	_ = e.writeEvent(ctx, events.NewToolCallEndEvent(event.ToolCall.ID))
-	_ = e.writeEvent(ctx, events.NewToolCallResultEvent(uuid.New().String(), event.ToolCall.ID, event.Result.Content))
+	_ = e.writeEvent(ctx, events.NewToolCallResultEvent(uuid.New().String(), event.ToolCall.ID, event.Result.ClientPayload()))
 	return nil
 }
 

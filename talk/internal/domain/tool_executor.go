@@ -45,17 +45,26 @@ func (e *ToolExecutor) Execute(ctx context.Context, turnID string, calls []ToolC
 // ExecuteTool executes a single tool call and returns the result.
 func (e *ToolExecutor) ExecuteTool(ctx context.Context, call ToolCall) (ToolResult, error) {
 	for _, t := range e.toolsProvider() {
-		if t.Name() == call.Name {
-			content, err := t.Execute(ctx, call.Input)
-			if err != nil {
-				return ToolResult{}, fmt.Errorf("tool %q execution: %w", call.Name, err)
-			}
-			contentBytes, err := json.Marshal(content)
-			if err != nil {
-				return ToolResult{}, fmt.Errorf("marshalling tool output for tool %q: %w", call.Name, err)
-			}
-			return ToolResult{ToolCallID: call.ID, Content: string(contentBytes)}, nil
+		if t.Name() != call.Name {
+			continue
 		}
+		out, err := t.Execute(ctx, call.Input)
+		if err != nil {
+			return ToolResult{}, fmt.Errorf("tool %q execution: %w", call.Name, err)
+		}
+		modelBytes, err := json.Marshal(out.Model)
+		if err != nil {
+			return ToolResult{}, fmt.Errorf("marshalling tool output for tool %q: %w", call.Name, err)
+		}
+		result := ToolResult{ToolCallID: call.ID, Content: string(modelBytes)}
+		if out.Client != nil {
+			clientBytes, err := json.Marshal(out.Client)
+			if err != nil {
+				return ToolResult{}, fmt.Errorf("marshalling client tool output for tool %q: %w", call.Name, err)
+			}
+			result.ClientContent = string(clientBytes)
+		}
+		return result, nil
 	}
 	return ToolResult{}, fmt.Errorf("unknown tool %q", call.Name)
 }

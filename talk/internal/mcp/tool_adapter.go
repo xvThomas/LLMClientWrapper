@@ -60,10 +60,10 @@ func (a *mcpToolAdapter) OutputSchema() (map[string]any, error) {
 	}, nil
 }
 
-func (a *mcpToolAdapter) Execute(ctx context.Context, input map[string]any) (map[string]any, error) {
+func (a *mcpToolAdapter) Execute(ctx context.Context, input map[string]any) (domain.ToolOutput, error) {
 	session, err := a.manager.EnsureConnected(ctx, a.serverID)
 	if err != nil {
-		return nil, fmt.Errorf("MCP tool execution is unavailable for server %q: %w", a.serverName, err)
+		return domain.ToolOutput{}, fmt.Errorf("MCP tool execution is unavailable for server %q: %w", a.serverName, err)
 	}
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
@@ -72,12 +72,12 @@ func (a *mcpToolAdapter) Execute(ctx context.Context, input map[string]any) (map
 	})
 	if err != nil {
 		if !isReconnectableCallError(err) {
-			return nil, fmt.Errorf("calling tool %q on server %q: %w", a.tool.Name, a.serverName, err)
+			return domain.ToolOutput{}, fmt.Errorf("calling tool %q on server %q: %w", a.tool.Name, a.serverName, err)
 		}
 
 		session, reconnectErr := a.manager.Reconnect(ctx, a.serverID)
 		if reconnectErr != nil {
-			return nil, fmt.Errorf("MCP tool execution is unavailable for server %q: %w", a.serverName, reconnectErr)
+			return domain.ToolOutput{}, fmt.Errorf("MCP tool execution is unavailable for server %q: %w", a.serverName, reconnectErr)
 		}
 
 		result, err = session.CallTool(ctx, &mcp.CallToolParams{
@@ -85,21 +85,68 @@ func (a *mcpToolAdapter) Execute(ctx context.Context, input map[string]any) (map
 			Arguments: input,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("%w: calling tool %q on server %q after reconnect: %v", ErrSessionUnavailable, a.tool.Name, a.serverName, err)
+			return domain.ToolOutput{}, fmt.Errorf("%w: calling tool %q on server %q after reconnect: %v", ErrSessionUnavailable, a.tool.Name, a.serverName, err)
 		}
 	}
 	if result.IsError {
-		return nil, fmt.Errorf("tool %q returned error: %s", a.tool.Name, extractTextContent(result.Content))
+		return domain.ToolOutput{}, fmt.Errorf("tool %q returned error: %s", a.tool.Name, extractTextContent(result.Content))
 	}
-	text := extractTextContent(result.Content)
-	var parsed map[string]any
-	if err := json.Unmarshal([]byte(text), &parsed); err == nil {
-		return parsed, nil
+
+	modelText := textForAudience(result.Content, roleAssistant)
+	out := domain.ToolOutput{Model: decodeToolText(modelText)}
+	if clientText := textForAudience(result.Content, roleUser); clientText != modelText {
+		out.Client = decodeToolText(clientText)
 	}
-	return map[string]any{"content": text}, nil
+	return out, nil
 }
 
-// extractTextContent concatenates text content from an MCP tool result.
+// MCP roles used to address tool result content blocks. The SDK declares Role
+// as a bare string type without exported constants.
+const (
+	roleAssistant mcp.Role = "assistant"
+	roleUser      mcp.Role = "user"
+)
+
+// decodeToolText turns a tool text payload into a map, falling back to a
+// single "content" entry when the payload is not a JSON object.
+func decodeToolText(text string) map[string]any {
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(text), &parsed); err == nil {
+		return parsed
+	}
+	return map[string]any{"content": text}
+}
+
+// textForAudience concatenates the text blocks addressed to the given role.
+// Blocks without an audience annotation are addressed to every audience.
+func textForAudience(content []mcp.Content, role mcp.Role) string {
+	var text string
+	for _, c := range content {
+		tc, ok := c.(*mcp.TextContent)
+		if !ok || !addressedTo(tc.Annotations, role) {
+			continue
+		}
+		if text != "" {
+			text += "\n"
+		}
+		text += tc.Text
+	}
+	return text
+}
+
+func addressedTo(annotations *mcp.Annotations, role mcp.Role) bool {
+	if annotations == nil || len(annotations.Audience) == 0 {
+		return true
+	}
+	for _, r := range annotations.Audience {
+		if r == role {
+			return true
+		}
+	}
+	return false
+}
+
+// extractTextContent concatenates every text block of an MCP tool result.
 func extractTextContent(content []mcp.Content) string {
 	var text string
 	for _, c := range content {

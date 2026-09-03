@@ -151,9 +151,9 @@ type stubTool struct {
 func (t *stubTool) Name() string               { return t.name }
 func (t *stubTool) Description() string        { return "stub tool" }
 func (t *stubTool) Parameters() map[string]any { return map[string]any{} }
-func (t *stubTool) Execute(_ context.Context, _ map[string]any) (map[string]any, error) {
+func (t *stubTool) Execute(_ context.Context, _ map[string]any) (ToolOutput, error) {
 	t.called.Add(1)
-	return t.result, t.err
+	return ToolOutput{Model: t.result}, t.err
 }
 func (t *stubTool) InputSchema() (map[string]any, error) {
 	return map[string]any{

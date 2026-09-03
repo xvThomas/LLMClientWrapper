@@ -380,8 +380,8 @@ func TestToolAdapter_Execute_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got["content"] != "echo:hello" {
-		t.Fatalf("Execute() content = %v, want %q", got["content"], "echo:hello")
+	if got.Model["content"] != "echo:hello" {
+		t.Fatalf("Execute() content = %v, want %q", got.Model["content"], "echo:hello")
 	}
 }
 
@@ -412,10 +412,10 @@ func TestToolAdapter_Execute_JSONOutput(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	// JSON output is returned parsed — geometry must be accessible without unwrapping.
-	if _, ok := got["geometry"]; !ok {
-		t.Fatalf("Execute() result missing 'geometry' key; got keys: %v", keySet(got))
+	if _, ok := got.Model["geometry"]; !ok {
+		t.Fatalf("Execute() result missing 'geometry' key; got keys: %v", keySet(got.Model))
 	}
-	if _, hasContent := got["content"]; hasContent {
+	if _, hasContent := got.Model["content"]; hasContent {
 		t.Fatalf("Execute() must not wrap JSON output in {\"content\": ...}")
 	}
 }
@@ -538,8 +538,8 @@ func TestToolAdapter_Execute_ReconnectsAndRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got["content"] != "echo:hello" {
-		t.Fatalf("Execute() content = %v, want %q", got["content"], "echo:hello")
+	if got.Model["content"] != "echo:hello" {
+		t.Fatalf("Execute() content = %v, want %q", got.Model["content"], "echo:hello")
 	}
 	defer func() { _ = reconnectedSession.Close() }()
 }
