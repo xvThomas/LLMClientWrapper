@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -480,7 +481,10 @@ func (m *Manager) connect(ctx context.Context, cfg ServerConfig) (*mcp.ClientSes
 	connectCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 
-	httpClient := buildHTTPClient(cfg)
+	httpClient, err := buildHTTPClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("building HTTP client for %q: %w", cfg.Name, err)
+	}
 	transport := &mcp.StreamableClientTransport{
 		Endpoint:   cfg.URL,
 		HTTPClient: httpClient,
@@ -498,21 +502,23 @@ func (m *Manager) connect(ctx context.Context, cfg ServerConfig) (*mcp.ClientSes
 }
 
 // buildHTTPClient returns an *http.Client configured for the server's auth type.
-func buildHTTPClient(cfg ServerConfig) *http.Client {
-	switch cfg.AuthType {
-	case AuthTypeAPIKey:
-		if cfg.APIKey == "" {
-			return http.DefaultClient
-		}
-		return &http.Client{
-			Transport: &apiKeyTransport{
-				key:  cfg.APIKey,
-				base: http.DefaultTransport,
-			},
-		}
-	default:
-		return http.DefaultClient
+// It always carries a cookie jar so that session affinity cookies issued by a
+// reverse proxy are sent back, keeping every request of a session on the same
+// replica.
+func buildHTTPClient(cfg ServerConfig) (*http.Client, error) {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating cookie jar: %w", err)
 	}
+
+	client := &http.Client{Jar: jar}
+	if cfg.AuthType == AuthTypeAPIKey && cfg.APIKey != "" {
+		client.Transport = &apiKeyTransport{
+			key:  cfg.APIKey,
+			base: http.DefaultTransport,
+		}
+	}
+	return client, nil
 }
 
 // apiKeyTransport injects an X-API-Key header into every request.

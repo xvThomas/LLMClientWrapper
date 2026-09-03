@@ -165,25 +165,37 @@ func TestManager_ConnectWrapsServerIdentityInError(t *testing.T) {
 
 func TestBuildHTTPClient_NoAuth(t *testing.T) {
 	cfg := ServerConfig{AuthType: AuthTypeNone}
-	client := buildHTTPClient(cfg)
-	if client != http.DefaultClient {
-		t.Error("expected DefaultClient for AuthTypeNone")
+	client, err := buildHTTPClient(cfg)
+	if err != nil {
+		t.Fatalf("buildHTTPClient: %v", err)
+	}
+	if client.Transport != nil {
+		t.Error("expected no custom transport for AuthTypeNone")
+	}
+	if client.Jar == nil {
+		t.Error("expected a cookie jar for proxy session affinity")
 	}
 }
 
 func TestBuildHTTPClient_APIKeyEmpty(t *testing.T) {
 	cfg := ServerConfig{AuthType: AuthTypeAPIKey, APIKey: ""}
-	client := buildHTTPClient(cfg)
-	if client != http.DefaultClient {
-		t.Error("expected DefaultClient when APIKey is empty")
+	client, err := buildHTTPClient(cfg)
+	if err != nil {
+		t.Fatalf("buildHTTPClient: %v", err)
+	}
+	if client.Transport != nil {
+		t.Error("expected no custom transport when APIKey is empty")
 	}
 }
 
 func TestBuildHTTPClient_APIKey(t *testing.T) {
 	cfg := ServerConfig{AuthType: AuthTypeAPIKey, APIKey: "test-key-123"}
-	client := buildHTTPClient(cfg)
-	if client == http.DefaultClient {
-		t.Fatal("expected custom client for API key auth")
+	client, err := buildHTTPClient(cfg)
+	if err != nil {
+		t.Fatalf("buildHTTPClient: %v", err)
+	}
+	if client.Transport == nil {
+		t.Fatal("expected custom transport for API key auth")
 	}
 
 	// Verify the transport injects the header.

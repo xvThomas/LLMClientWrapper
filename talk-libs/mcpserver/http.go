@@ -28,6 +28,10 @@ func (a *App) runHTTP(addr string) {
 	})
 	streamableHandler := mcp.NewStreamableHTTPHandler(serverFactory, &mcp.StreamableHTTPOptions{
 		DisableLocalhostProtection: behindProxy,
+		// Sessions live in a single process memory, so any replica behind a load
+		// balancer would reject requests routed to it. These tools are pure
+		// request/response, so no session state is needed.
+		Stateless: true,
 	})
 
 	mux := http.NewServeMux()
