@@ -23,6 +23,38 @@ func testDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func TestValidateServerName(t *testing.T) {
+	cases := []struct {
+		name  string
+		valid bool
+	}{
+		{"owm", true},
+		{"ign-nav", true},
+		{"a", true},
+		{"a1", true},
+		{"", false},
+		{"OWM", false},
+		{"my_srv", false},
+		{"-owm", false},
+		{"owm-", false},
+		{"météo", false},
+		{"has space", false},
+		{"aaaaaaaaaaaaaaaaaaaaaaaaa", false}, // 25 characters
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateServerName(tc.name)
+			if tc.valid && err != nil {
+				t.Errorf("expected %q to be valid, got %v", tc.name, err)
+			}
+			if !tc.valid && err == nil {
+				t.Errorf("expected %q to be rejected", tc.name)
+			}
+		})
+	}
+}
+
 func TestSQLiteRegistry_AddAndList(t *testing.T) {
 	db := testDB(t)
 	reg, err := NewSQLiteRegistry(db)

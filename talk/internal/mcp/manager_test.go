@@ -211,8 +211,8 @@ func TestToolAdapter_InputSchema_Nil(t *testing.T) {
 		serverName: "test-server",
 		tool:       mcpTool("my-tool", "does things", nil),
 	}
-	if adapter.Name() != "my-tool" {
-		t.Errorf("expected name %q, got %q", "my-tool", adapter.Name())
+	if adapter.Name() != "test-server__my-tool" {
+		t.Errorf("expected name %q, got %q", "test-server__my-tool", adapter.Name())
 	}
 	if adapter.Description() != "does things" {
 		t.Errorf("expected description %q, got %q", "does things", adapter.Description())

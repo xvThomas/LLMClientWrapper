@@ -12,6 +12,9 @@ import (
 
 const cancelled = "Cancelled."
 
+// labelledLine formats a coloured label followed by its detail.
+const labelledLine = "%s %s\n"
+
 func (a *App) cmdMCP(ctx context.Context, args string) {
 	parts := strings.Fields(args)
 	if len(parts) == 0 {
@@ -64,12 +67,27 @@ func (a *App) cmdMCPList() {
 }
 
 func (a *App) cmdMCPAdd(ctx context.Context) {
-	name, err := a.LR.ReadLine("Server name: ")
+	name, err := a.LR.ReadLine("Server name (lowercase letters, digits, hyphens; 24 max): ")
 	if err != nil || strings.TrimSpace(name) == "" {
 		a.Println(yellow(cancelled))
 		return
 	}
-	name = strings.TrimSpace(name)
+	name = strings.ToLower(strings.TrimSpace(name))
+
+	if err := mcp.ValidateServerName(name); err != nil {
+		a.Printf(labelledLine, red("Invalid server name:"), err.Error())
+		return
+	}
+
+	taken, err := a.serverNameTaken(ctx, name)
+	if err != nil {
+		a.Printf(labelledLine, red("Failed to check existing servers:"), err.Error())
+		return
+	}
+	if taken {
+		a.Printf(labelledLine, red("A server with this name already exists:"), cyan(name))
+		return
+	}
 
 	url, err := a.LR.ReadLine("Server URL: ")
 	if err != nil || strings.TrimSpace(url) == "" {
@@ -103,13 +121,13 @@ func (a *App) cmdMCPAdd(ctx context.Context) {
 	a.Printf("Testing connection to %s...\n", faint(cfg.URL))
 	status, err := a.MCPManager.Connect(ctx, cfg)
 	if err != nil {
-		a.Printf("%s %s\n", red("Connection failed:"), err.Error())
+		a.Printf(labelledLine, red("Connection failed:"), err.Error())
 		return
 	}
 
 	// Persist.
 	if err := a.MCPRegistry.Add(ctx, cfg); err != nil {
-		a.Printf("%s %s\n", red("Failed to save:"), err.Error())
+		a.Printf(labelledLine, red("Failed to save:"), err.Error())
 		return
 	}
 
@@ -118,6 +136,21 @@ func (a *App) cmdMCPAdd(ctx context.Context) {
 		a.Printf(" %s", faint("("+status.ServerName+" "+status.ServerVersion+")"))
 	}
 	a.Printf(" — %d tools\n", len(status.Tools))
+}
+
+// serverNameTaken reports whether a server is already registered under name.
+// The check is case-insensitive to also cover rows predating name validation.
+func (a *App) serverNameTaken(ctx context.Context, name string) (bool, error) {
+	configs, err := a.MCPRegistry.List(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, cfg := range configs {
+		if strings.EqualFold(cfg.Name, name) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // buildMCPAuthConfig prompts for credentials and fills cfg accordingly.

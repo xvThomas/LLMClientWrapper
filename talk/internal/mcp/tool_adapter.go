@@ -18,8 +18,10 @@ type mcpToolAdapter struct {
 	tool       mcp.Tool
 }
 
+// Name namespaces the remote tool with its server name so that identically
+// named tools from different MCP servers stay distinguishable for the LLM.
 func (a *mcpToolAdapter) Name() string {
-	return a.tool.Name
+	return a.serverName + ToolNameSeparator + a.tool.Name
 }
 
 func (a *mcpToolAdapter) Description() string {
