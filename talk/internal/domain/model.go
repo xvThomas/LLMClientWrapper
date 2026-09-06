@@ -87,12 +87,13 @@ func (m Model) EffectiveOutputLimit() int64 {
 
 // registry holds all supported models.
 var registry = []Model{
-	{Name: "haiku-4.5", OLTPProvider: OLTPProviderAnthropic, APIClient: APIClientAnthropic, APIKeyName: "ANTHROPIC_API_KEY", APIModelID: "claude-haiku-4-5", ThinkingStyle: ThinkingStyleBudget, RequestMaxOutputTokens: 8192},
-	{Name: "sonnet-4.6", OLTPProvider: OLTPProviderAnthropic, APIClient: APIClientAnthropic, APIKeyName: "ANTHROPIC_API_KEY", APIModelID: "claude-sonnet-4-5", ThinkingStyle: ThinkingStyleBudget, RequestMaxOutputTokens: 16384},
-	{Name: "opus-4.6", OLTPProvider: OLTPProviderAnthropic, APIClient: APIClientAnthropic, APIModelID: "claude-opus-4-6", ThinkingStyle: ThinkingStyleAdaptive, RequestMaxOutputTokens: 16384},
-	{Name: "o4-mini", OLTPProvider: OLTPProviderOpenAI, APIClient: APIClientOpenAI, APIKeyName: "OPENAI_API_KEY", APIModelID: "o4-mini", ThinkingStyle: ThinkingStyleEffort, RequestMaxOutputTokens: 16384, OutputLimitParameter: OutputLimitParameterMaxCompletionTokens},
-	{Name: "gpt-5.4", OLTPProvider: OLTPProviderOpenAI, APIClient: APIClientOpenAI, APIKeyName: "OPENAI_API_KEY", APIModelID: "gpt-4o", RequestMaxOutputTokens: 16384, OutputLimitParameter: OutputLimitParameterMaxTokens},
-	{Name: "mistral-small", OLTPProvider: OLTPProviderMistral, APIClient: APIClientOpenAI, APIKeyName: "MISTRAL_API_KEY", URL: "https://api.mistral.ai/v1", APIModelID: "mistral-small-2506", RequestMaxOutputTokens: 8192, OutputLimitParameter: OutputLimitParameterMaxTokens},
+	{Name: "haiku-4.5", OLTPProvider: OLTPProviderAnthropic, APIClient: APIClientAnthropic, APIKeyName: "ANTHROPIC_API_KEY", APIModelID: "claude-haiku-4-5", ThinkingStyle: ThinkingStyleBudget, ContextWindowTokens: 200_000, ProviderMaxOutputTokens: 64_000, RequestMaxOutputTokens: 8192},
+	{Name: "sonnet-4.6", OLTPProvider: OLTPProviderAnthropic, APIClient: APIClientAnthropic, APIKeyName: "ANTHROPIC_API_KEY", APIModelID: "claude-sonnet-4-5", ThinkingStyle: ThinkingStyleBudget, ContextWindowTokens: 200_000, ProviderMaxOutputTokens: 64_000, RequestMaxOutputTokens: 16384},
+	{Name: "sonnet-5", OLTPProvider: OLTPProviderAnthropic, APIClient: APIClientAnthropic, APIKeyName: "ANTHROPIC_API_KEY", APIModelID: "claude-sonnet-5", ThinkingStyle: ThinkingStyleAdaptive, ContextWindowTokens: 1_000_000, ProviderMaxOutputTokens: 128_000, RequestMaxOutputTokens: 16384},
+	{Name: "opus-4.6", OLTPProvider: OLTPProviderAnthropic, APIClient: APIClientAnthropic, APIKeyName: "ANTHROPIC_API_KEY", APIModelID: "claude-opus-4-6", ThinkingStyle: ThinkingStyleAdaptive, ContextWindowTokens: 1_000_000, ProviderMaxOutputTokens: 128_000, RequestMaxOutputTokens: 16384},
+	{Name: "o4-mini", OLTPProvider: OLTPProviderOpenAI, APIClient: APIClientOpenAI, APIKeyName: "OPENAI_API_KEY", APIModelID: "o4-mini", ThinkingStyle: ThinkingStyleEffort, ContextWindowTokens: 200_000, ProviderMaxOutputTokens: 100_000, RequestMaxOutputTokens: 16384, OutputLimitParameter: OutputLimitParameterMaxCompletionTokens},
+	{Name: "gpt-5.4", OLTPProvider: OLTPProviderOpenAI, APIClient: APIClientOpenAI, APIKeyName: "OPENAI_API_KEY", APIModelID: "gpt-4o", ContextWindowTokens: 128_000, ProviderMaxOutputTokens: 16_384, RequestMaxOutputTokens: 16384, OutputLimitParameter: OutputLimitParameterMaxTokens},
+	{Name: "mistral-small", OLTPProvider: OLTPProviderMistral, APIClient: APIClientOpenAI, APIKeyName: "MISTRAL_API_KEY", URL: "https://api.mistral.ai/v1", APIModelID: "mistral-small-4-0-26-03", RequestMaxOutputTokens: 8192, OutputLimitParameter: OutputLimitParameterMaxTokens},
 }
 
 // Lookup returns the model details for a given alias.
